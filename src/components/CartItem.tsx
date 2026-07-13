@@ -1,66 +1,170 @@
+import { useState } from "react";
+import { FaTrashAlt } from "react-icons/fa";
 import {
     Dropdown,
-    Rb_Image,
+    Modal,
+    ModalHeader,
+    ModalBody,
+    ModalFooter,
+    Rb_Button,
     Rb_Icon,
+    Rb_Image,
     Rb_Text,
-} from "rentbook-ui-lib";
+} from "@rentbook/rentbook-ui-lib";
 import { CartItemType } from "../types/cart";
-import { FaTrash } from "react-icons/fa";
+import { useDeleteCartItem } from "../hooks/useDeleteCartItem";
+import { showToast } from "../utils/ToastFunction";
+
 interface Props {
     item: CartItemType;
 }
 
 export default function CartItem({ item }: Props) {
+    const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
+
+    const { mutate: deleteItem, isPending } = useDeleteCartItem();
+
+    const getRentalPrice = () => {
+        switch (item.rentalPeriod) {
+            case "day":
+                return item.bookId.rentalPricePerDay;
+            case "week":
+                return item.bookId.rentalPricePerWeek;
+            case "month":
+                return item.bookId.rentalPricePerMonth;
+            default:
+                return 0;
+        }
+    };
+
+    const handleDelete = () => {
+        deleteItem(
+            {
+                bookId: item.bookId._id,
+                pricingMode: item.pricingMode,
+                rentalPeriod: item.rentalPeriod,
+            },
+            {
+                onSuccess: () => {
+                    setDeleteModalOpen(false);
+                    showToast(`${item.bookId.name} removed from cart`);
+                },
+                onError: () => {
+                    showToast("Failed to remove book from cart", "error");
+                },
+            }
+        );
+    };
+
     return (
-        <div className="flex items-center gap-6 rounded-xl border border-gray-200 bg-white p-6">
+        <>
+            <div className="rounded-xl border border-gray-200 bg-white p-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_170px_110px_40px] md:items-center">
 
-            <Rb_Image
-                src={item.image}
-                alt={item.title}
-                width={100}
-                height={100}
+                    <div className="flex items-center gap-4">
+                        <Rb_Image
+                            src={item.bookId.coverImage}
+                            alt={item.bookId.name}
+                            width={100}
+                            height={100}
+                            className="h-20 w-16 rounded-md object-cover"
+                        />
+                        <div className="space-y-1">
+                            <Rb_Text className="text-base font-semibold text-gray-900">
+                                {item.bookId.name}
+                            </Rb_Text>
 
-            />
+                            <Rb_Text
+                                variant="small"
+                                className="block text-sm text-gray-500 italic"
+                            >
+                                By {item.bookId.author}
+                            </Rb_Text>
 
-            <div className="flex-1">
-                <Rb_Text className="font-semibold text-lg">
-                    {item.title}
-                </Rb_Text>
+                            <Rb_Text
+                                variant="small"
+                                className="block mt-1 text-sm text-gray-600"
+                            >
+                                Qty: <span className="font-medium">{item.quantity}</span>
+                            </Rb_Text>
+                        </div>
+                    </div>
 
-                <Rb_Text className="text-gray-500 text-sm">
-                    {item.author}
-                </Rb_Text>
+                    <div>
+                        <Rb_Text
+                            variant="p"
+                            className="mb-2 text-sm text-gray-500"
+                        >
+                            Duration
+                        </Rb_Text>
+
+                        <Dropdown
+                            value={item.rentalPeriod}
+                            onChange={(value) => console.log(value)}
+                            options={[
+                                { label: "Day", value: "day" },
+                                { label: "Week", value: "week" },
+                                { label: "Month", value: "month" },
+                            ]}
+                        />
+                    </div>
+
+                    <div className="text-left md:text-right">
+                        <Rb_Text className="text-lg font-bold">
+                            ₹{getRentalPrice()}
+                        </Rb_Text>
+
+                        <Rb_Text
+                            variant="small"
+                            className="text-gray-400"
+                        >
+                            ₹{item.bookId.securityDeposit} deposit
+                        </Rb_Text>
+                    </div>
+
+                    <div className="flex md:justify-end">
+                        <Rb_Icon
+                            data-testid="rb-icon"
+                            icon={FaTrashAlt}
+                            className="cursor-pointer text-gray-400 hover:text-red-500"
+                            onClick={() => setDeleteModalOpen(true)}
+                        />
+                    </div>
+                </div>
             </div>
 
-            <div className="w-40">
-                <Rb_Text variant="p" >Duration</Rb_Text>
+            <Modal
+                isOpen={isDeleteModalOpen}
+                onClose={() => setDeleteModalOpen(false)}
+            >
+                <ModalHeader
+                    onClose={() => setDeleteModalOpen(false)}
+                >
+                    Remove Book
+                </ModalHeader>
 
-                <Dropdown
-                    value={item.duration}
-                    onChange={(value) => console.log(value)}
-                    options={[
-                        { label: "15 Days", value: "15 Days" },
-                        { label: "30 Days", value: "30 Days" },
-                        { label: "45 Days", value: "45 Days" },
-                    ]}
-                />
-            </div>
+                <ModalBody>
+                    Are you sure you want to remove{" "}
+                    <strong>{item.bookId.name}</strong> from your cart?
+                </ModalBody>
 
-            <div className="text-right">
-                <Rb_Text className="text-xl font-bold">
-                    ₹{item.rentPrice}
-                </Rb_Text>
+                <ModalFooter>
+                    <Rb_Button
+                        variant="secondary"
+                        onClick={() => setDeleteModalOpen(false)}
+                    >
+                        Cancel
+                    </Rb_Button>
 
-                <Rb_Text variant="small">
-                    ₹{item.deposit} Deposit
-                </Rb_Text>
-            </div>
-
-            <Rb_Icon
-                icon={FaTrash}
-                className="cursor-pointer text-gray-500"
-            />
-
-        </div>
+                    <Rb_Button
+                        className="!bg-red-500"
+                        onClick={handleDelete}
+                        disabled={isPending}
+                    >
+                        Remove
+                    </Rb_Button>
+                </ModalFooter>
+            </Modal>
+        </>
     );
 }

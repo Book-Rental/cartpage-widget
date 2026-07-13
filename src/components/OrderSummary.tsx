@@ -1,55 +1,87 @@
-import { Rb_Button, Rb_Text } from "rentbook-ui-lib";
+import { Rb_Button, Rb_Text } from "@rentbook/rentbook-ui-lib";
+import { CartSummary } from "../types/cart";
 
-export default function OrderSummary() {
+interface Props {
+    summary: CartSummary;
+    itemCount: number;
+}
+
+export default function OrderSummary({
+    summary,
+    itemCount,
+}: Props) {
+    const hasItems = itemCount > 0;
     return (
-        <div className="rounded-xl border border-gray-200 bg-white p-8">
+        <div className="rounded-xl border border-gray-200 bg-white p-5">
 
-            <Rb_Text variant="h2" className="mb-6">
+            <Rb_Text
+                variant="h2"
+                className="mb-6 text-xl font-semibold sm:text-2xl"
+            >
                 Order Summary
             </Rb_Text>
 
             <div className="space-y-5">
 
-                <div className="flex justify-between">
-                    <Rb_Text variant="p">Rental Charges (2 Books)</Rb_Text>
-                    <Rb_Text variant="p">₹148</Rb_Text>
+                <div className="flex items-center justify-between">
+                    <Rb_Text>
+                        Rental Charges ({itemCount} {itemCount === 1 ? "Book" : "Books"})
+                    </Rb_Text>
+
+                    <Rb_Text>
+                        ₹{summary.subtotal}
+                    </Rb_Text>
                 </div>
 
-                <div className="flex justify-between">
-                    <Rb_Text variant="p">Security Deposit</Rb_Text>
-                    <Rb_Text variant="p">₹400</Rb_Text>
+                <div className="flex items-center justify-between">
+                    <Rb_Text>
+                        Security Deposit
+                    </Rb_Text>
+
+                    <Rb_Text>
+                        ₹{summary.securityDepositTotal}
+                    </Rb_Text>
                 </div>
 
-                <div className="flex justify-between">
-                    <Rb_Text variant="p">Delivery Charges</Rb_Text>
-                    <Rb_Text variant="p">₹40</Rb_Text>
+                <div className="flex items-center justify-between">
+                    <Rb_Text>
+                        Delivery Charges
+                    </Rb_Text>
+
+                    <Rb_Text>
+                        ₹{hasItems ? summary.deliveryFee : 0}
+                    </Rb_Text>
                 </div>
 
-                <div className="flex justify-between">
-                    <Rb_Text variant="p">Tax (5%)</Rb_Text>
-                    <Rb_Text variant="p">₹9</Rb_Text>
+                <div className="flex items-center justify-between">
+                    <Rb_Text>
+                        Tax
+                    </Rb_Text>
+
+                    <Rb_Text>
+                        ₹{summary.tax}
+                    </Rb_Text>
                 </div>
 
             </div>
 
-            <hr className="my-6" />
+            <div className="my-6 border-t pt-6">
+                <div className="flex items-center justify-between">
 
-            <div className="mb-6 flex justify-between items-center">
+                    <Rb_Text variant="h4" className="font-bold">
+                        Total Amount
+                    </Rb_Text>
 
-                <Rb_Text variant="h4" className="font-bold">
-                    Total Amount
-                </Rb_Text>
+                    <Rb_Text variant="h4" className="font-bold">
+                        ₹{hasItems ? summary.total : 0}
+                    </Rb_Text>
 
-                <Rb_Text variant="h4" className="font-bold">
-                    ₹597
-                </Rb_Text>
-
+                </div>
             </div>
 
-            <Rb_Button className="w-full">
+            <Rb_Button className="mt-2 w-full">
                 Proceed to Checkout
             </Rb_Button>
-
         </div>
     );
 }
