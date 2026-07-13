@@ -1,6 +1,7 @@
 import { Rb_Button, Rb_Text } from "@rentbook/rentbook-ui-lib";
 import { CartSummary } from "../types/cart";
 
+
 interface Props {
     summary: CartSummary;
     itemCount: number;
@@ -79,7 +80,14 @@ export default function OrderSummary({
                 </div>
             </div>
 
-            <Rb_Button className="mt-2 w-full">
+            <Rb_Button
+                className="mt-2 w-full"
+                onClick={() => {
+                    window.history.pushState({}, "", "/checkout");
+
+                    window.dispatchEvent(new PopStateEvent("popstate"));
+                }}
+            >
                 Proceed to Checkout
             </Rb_Button>
         </div>
