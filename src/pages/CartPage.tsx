@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
     Modal,
     ModalBody,
@@ -18,6 +18,12 @@ export default function CartPage() {
     const { data, isLoading, isError } = useCart();
     const { mutate: clearCart, isPending } = useClearCart();
     const [isClearModalOpen, setClearModalOpen] = useState(false);
+    useEffect(() => {
+        const event = new CustomEvent("widget-loading-status", {
+            detail: isLoading
+        });
+        window.dispatchEvent(event);
+    }, [isLoading]);
 
     if (isLoading) {
         return <Rb_LoadingSpinner text="Loading cart details..." />;
