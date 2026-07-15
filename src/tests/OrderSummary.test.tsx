@@ -40,7 +40,7 @@ describe("OrderSummary", () => {
         expect(screen.getByText("₹500")).toBeInTheDocument();
         expect(screen.getByText("₹1000")).toBeInTheDocument();
         expect(screen.getByText("₹50")).toBeInTheDocument();
-        expect(screen.getByText("₹25")).toBeInTheDocument();
+        expect(screen.getByText("₹25.00")).toBeInTheDocument();
         expect(screen.getByText("₹1575")).toBeInTheDocument();
     });
 
