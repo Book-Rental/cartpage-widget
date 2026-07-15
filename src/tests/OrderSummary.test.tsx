@@ -1,7 +1,16 @@
-import { render, screen } from "@testing-library/react";
-import { describe, it, expect } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
 import OrderSummary from "../components/OrderSummary";
 import { CartSummary } from "../types/cart";
+
+// Mock CheckoutPage
+vi.mock("../pages/CheckoutPage", () => ({
+    default: ({ totalAmount }: { totalAmount: number }) => (
+        <div data-testid="checkout-page">
+            Checkout Page - ₹{totalAmount}
+        </div>
+    ),
+}));
 
 const mockSummary: CartSummary = {
     subtotal: 500,
@@ -11,6 +20,7 @@ const mockSummary: CartSummary = {
     total: 1575,
     items: [],
 };
+
 describe("OrderSummary", () => {
     it("renders the order summary heading", () => {
         render(
@@ -82,5 +92,98 @@ describe("OrderSummary", () => {
                 name: /proceed to checkout/i,
             })
         ).toBeInTheDocument();
+    });
+
+    it("opens the checkout modal when Proceed to Checkout is clicked", () => {
+        render(
+            <OrderSummary
+                summary={mockSummary}
+                itemCount={2}
+            />
+        );
+
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: /proceed to checkout/i,
+            })
+        );
+
+        expect(screen.getByText("Checkout")).toBeInTheDocument();
+
+        expect(screen.getByTestId("checkout-page")).toBeInTheDocument();
+
+        expect(
+            screen.getByText("Checkout Page - ₹1575")
+        ).toBeInTheDocument();
+    });
+
+    it("passes the correct total amount to CheckoutPage", () => {
+        render(
+            <OrderSummary
+                summary={mockSummary}
+                itemCount={2}
+            />
+        );
+
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: /proceed to checkout/i,
+            })
+        );
+
+        expect(
+            screen.getByText("Checkout Page - ₹1575")
+        ).toBeInTheDocument();
+    });
+
+    it("closes the modal when the header close button is clicked", () => {
+        render(
+            <OrderSummary
+                summary={mockSummary}
+                itemCount={2}
+            />
+        );
+
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: /proceed to checkout/i,
+            })
+        );
+
+        expect(screen.getByText("Checkout")).toBeInTheDocument();
+
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: /close modal/i,
+            })
+        );
+
+        expect(screen.queryByText("Checkout")).not.toBeInTheDocument();
+    });
+
+    it("re-opens the modal after being closed", () => {
+        render(
+            <OrderSummary
+                summary={mockSummary}
+                itemCount={2}
+            />
+        );
+
+        const openButton = screen.getByRole("button", {
+            name: /proceed to checkout/i,
+        });
+
+        fireEvent.click(openButton);
+        expect(screen.getByText("Checkout")).toBeInTheDocument();
+
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: /close modal/i,
+            })
+        );
+        expect(screen.queryByText("Checkout")).not.toBeInTheDocument();
+
+        fireEvent.click(openButton);
+        expect(screen.getByText("Checkout")).toBeInTheDocument();
     });
 });

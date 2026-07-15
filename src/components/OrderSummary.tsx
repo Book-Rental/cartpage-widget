@@ -22,6 +22,9 @@ export default function OrderSummary({
     const hasItems = itemCount > 0;
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
+    const handleOpenCheckout = () => setIsCheckoutOpen(true);
+    const handleCloseCheckout = () => setIsCheckoutOpen(false);
+
     return (
         <>
             <div className="rounded-xl border border-gray-200 bg-white p-5">
@@ -77,7 +80,7 @@ export default function OrderSummary({
 
                 <Rb_Button
                     className="mt-2 w-full"
-                    onClick={() => setIsCheckoutOpen(true)}
+                    onClick={handleOpenCheckout}
                 >
                     Proceed to Checkout
                 </Rb_Button>
@@ -85,10 +88,10 @@ export default function OrderSummary({
 
             <Modal
                 isOpen={isCheckoutOpen}
-                onClose={() => setIsCheckoutOpen(false)}
+                onClose={handleCloseCheckout}
                 className="max-h-[95vh] flex flex-col"
             >
-                <ModalHeader onClose={() => setIsCheckoutOpen(false)}>
+                <ModalHeader onClose={handleCloseCheckout}>
                     Checkout
                 </ModalHeader>
 
