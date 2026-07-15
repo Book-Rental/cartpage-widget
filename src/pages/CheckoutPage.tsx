@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 
 interface CheckoutPageProps {
-    totalAmount: number;
+    totalAmount?: number;
 }
 
 const CheckoutPage: React.FC<CheckoutPageProps> = ({ totalAmount }) => {
