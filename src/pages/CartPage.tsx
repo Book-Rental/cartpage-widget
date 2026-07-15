@@ -49,7 +49,7 @@ export default function CartPage() {
     };
 
     return (
-        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div className=" w-full px-4 py-6 sm:px-6 lg:px-8">
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-[3fr_1.1fr]">
                 <div>
                     <div className="rounded-xl border border-gray-200 bg-white p-6">

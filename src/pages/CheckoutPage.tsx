@@ -1,8 +1,10 @@
 import { useEffect } from "react";
 
-function CheckoutPage() {
-    const totalAmount = 100;
+interface CheckoutPageProps {
+    totalAmount?: number;
+}
 
+const CheckoutPage: React.FC<CheckoutPageProps> = ({ totalAmount }) => {
     const paymentWidgetUrl = import.meta.env.VITE_PAYMENT_WIDGET_URL;
     const returnUrl = import.meta.env.VITE_RETURN_URL;
 
@@ -13,38 +15,15 @@ function CheckoutPage() {
 
         if (!container) return;
 
-
-        container.setAttribute(
-            "data-price",
-            String(totalAmount)
-        );
-
-        container.setAttribute(
-            "data-merchant-name",
-            "RentBook"
-        );
-
-        container.setAttribute(
-            "data-currency",
-            "INR"
-        );
-
-        container.setAttribute(
-            "data-return-url",
-            returnUrl
-        );
-
-        container.setAttribute(
-            "data-no-forwarding-path",
-            "true"
-        );
-
+        container.setAttribute("data-price", String(totalAmount));
+        container.setAttribute("data-merchant-name", "RentBook");
+        container.setAttribute("data-currency", "INR");
+        container.setAttribute("data-return-url", returnUrl);
+        container.setAttribute("data-no-forwarding-path", "true");
 
         const script = document.createElement("script");
-
         script.src = paymentWidgetUrl;
         script.async = true;
-
 
         script.onload = () => {
             window.renderReactWidget?.(
@@ -54,30 +33,23 @@ function CheckoutPage() {
             );
         };
 
-
         document.body.appendChild(script);
 
-
         return () => {
-
             window.unmountReactWidget?.(containerId);
 
             if (document.body.contains(script)) {
                 document.body.removeChild(script);
             }
         };
-
     }, [paymentWidgetUrl, returnUrl, totalAmount]);
 
-
     return (
-        <div>
-            <div
-                id="test-widget-container"
-                className="mb-6"
-            />
-        </div>
+        <div
+            id="test-widget-container"
+            className="mb-6"
+        />
     );
-}
+};
 
 export default CheckoutPage;
