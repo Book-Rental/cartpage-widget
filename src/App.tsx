@@ -3,7 +3,7 @@ import CartPage from "./pages/CartPage";
 import CheckoutPage from "./pages/CheckoutPage";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-
+import './index.css'
 const queryClient = new QueryClient();
 
 function App() {

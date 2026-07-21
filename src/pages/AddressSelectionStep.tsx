@@ -9,7 +9,9 @@ interface Props {
     onAddressSelected: (address: Address) => void;
 }
 
-export default function AddressSelectionStep({ onAddressSelected }: Props) {
+export default function AddressSelectionStep({
+    onAddressSelected,
+}: Props) {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -19,7 +21,8 @@ export default function AddressSelectionStep({ onAddressSelected }: Props) {
         if (!container) return;
 
         const handleWidgetLoading = (event: Event) => {
-            const customEvent = event as CustomEvent;
+            const customEvent = event as CustomEvent<boolean>;
+
             if (customEvent.detail !== undefined) {
                 setIsLoading(customEvent.detail);
             }
@@ -27,24 +30,27 @@ export default function AddressSelectionStep({ onAddressSelected }: Props) {
 
         const handleAddressSelected = (event: Event) => {
             const customEvent = event as CustomEvent<Address>;
-            if (customEvent.detail) {
-                console.log("Selected Address:", customEvent.detail);
-                onAddressSelected(customEvent.detail);
-            }
+
+            console.log("Selected Address:", customEvent.detail);
+
+            onAddressSelected(customEvent.detail);
         };
 
-        window.addEventListener("widget-loading-status", handleWidgetLoading);
-        window.addEventListener("profile-address-selected", handleAddressSelected);
+        window.addEventListener(
+            "profile-address-selected",
+            handleAddressSelected
+        );
+
+        window.addEventListener(
+            "widget-loading-status",
+            handleWidgetLoading
+        );
 
         const script = document.createElement("script");
         script.src = PROFILE_WIDGET_URL;
         script.async = true;
 
         script.onload = () => {
-            // window.HOST_USER_INFO = {
-            //     _id: '6a3bbe38827e96ec21dcb390'
-            // };
-
             window.renderReactWidget?.(
                 JSON.stringify({
                     containerElementId: WIDGET_CONTAINER_ID,
@@ -63,13 +69,20 @@ export default function AddressSelectionStep({ onAddressSelected }: Props) {
                 document.body.removeChild(script);
             }
 
-            window.removeEventListener("widget-loading-status", handleWidgetLoading);
-            window.removeEventListener("profile-address-selected", handleAddressSelected);
+            window.removeEventListener(
+                "widget-loading-status",
+                handleWidgetLoading
+            );
+
+            window.removeEventListener(
+                "profile-address-selected",
+                handleAddressSelected
+            );
         };
     }, [onAddressSelected]);
 
     return (
-        <div className="relative w-full min-h-[400px]">
+        <div className="relative min-h-[400px] w-full">
             {isLoading && (
                 <div className="absolute inset-0 flex items-center justify-center bg-gray-50/50">
                     <Rb_LoadingSpinner />
@@ -78,7 +91,11 @@ export default function AddressSelectionStep({ onAddressSelected }: Props) {
 
             <div
                 id={WIDGET_CONTAINER_ID}
-                className={isLoading ? "invisible h-0 overflow-hidden" : "w-full"}
+                className={
+                    isLoading
+                        ? "invisible h-0 overflow-hidden"
+                        : "w-full"
+                }
             />
         </div>
     );

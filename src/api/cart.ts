@@ -1,6 +1,6 @@
 import axios from "axios";
 import { endpoints } from "./api";
-import { CartData, CartResponse, RemoveCartItemPayload, ValidateCartResponse } from "../types/cart";
+import { CartData, CartResponse, RemoveCartItemPayload, UpdateCartQuantityPayload, ValidateCartResponse } from "../types/cart";
 
 export const fetchCart = async (): Promise<CartData> => {
 
@@ -47,6 +47,27 @@ export const removeCartItem = async ({
 export const clearCart = async () => {
     const { data } = await axios.delete(
         `${endpoints.cart}/clear`,
+        {
+            withCredentials: true,
+        }
+    );
+
+    return data;
+};
+
+export const updateCartQuantity = async ({
+    bookId,
+    quantity,
+    pricingMode,
+    rentalPeriod,
+}: UpdateCartQuantityPayload) => {
+    const { data } = await axios.patch(
+        `${endpoints.cart}/items/${bookId}`,
+        {
+            quantity,
+            pricingMode,
+            rentalPeriod,
+        },
         {
             withCredentials: true,
         }

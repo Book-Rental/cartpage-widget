@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FaTrashAlt } from "react-icons/fa";
 import {
     Dropdown,
@@ -10,10 +10,12 @@ import {
     Rb_Icon,
     Rb_Image,
     Rb_Text,
+    Rb_Quantity,
 } from "@rentbook/rentbook-ui-lib";
 import { CartItemType } from "../types/cart";
 import { useDeleteCartItem } from "../hooks/useDeleteCartItem";
 import { showToast } from "../utils/ToastFunction";
+import { useUpdateCartQuantity } from "../hooks/useUpdateCart";
 
 interface Props {
     item: CartItemType;
@@ -22,9 +24,20 @@ interface Props {
 
 export default function CartItem({ item, errorMessage }: Props) {
     const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
+    const {
+        mutate: updateQuantity,
+        isPending: isUpdatingQuantity,
+    } = useUpdateCartQuantity();
+    const [quantity, setQuantity] = useState(item.quantity);
 
-    const { mutate: deleteItem, isPending } = useDeleteCartItem();
+    useEffect(() => {
+        setQuantity(item.quantity);
+    }, [item.quantity]);
 
+    const {
+        mutate: deleteItem,
+        isPending: isDeletingItem,
+    } = useDeleteCartItem();
     const getRentalPrice = () => {
         switch (item.rentalPeriod) {
             case "day":
@@ -61,8 +74,8 @@ export default function CartItem({ item, errorMessage }: Props) {
         <>
             <div
                 className={`rounded-xl border bg-white p-4 ${errorMessage
-                        ? "border-red-300 bg-red-50/40"
-                        : "border-gray-200"
+                    ? "border-red-300 bg-red-50/40"
+                    : "border-gray-200"
                     }`}
             >
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_170px_110px_40px] md:items-center">
@@ -87,13 +100,30 @@ export default function CartItem({ item, errorMessage }: Props) {
                                 By {item.bookId.author}
                             </Rb_Text>
 
-                            <Rb_Text
-                                variant="small"
-                                className="block mt-1 text-sm text-gray-600"
-                            >
-                                Qty: <span className="font-medium">{item.quantity}</span>
-                            </Rb_Text>
 
+                            <Rb_Quantity
+                                value={quantity}
+                                min={1}
+                                disabled={isUpdatingQuantity}
+                                onChange={(value) => {
+                                    setQuantity(value);
+
+                                    updateQuantity(
+                                        {
+                                            bookId: item.bookId._id,
+                                            quantity: value,
+                                            pricingMode: item.pricingMode,
+                                            rentalPeriod: item.rentalPeriod,
+                                        },
+                                        {
+                                            onError: () => {
+                                                setQuantity(item.quantity);
+                                                showToast("Failed to update quantity", "error");
+                                            },
+                                        }
+                                    );
+                                }}
+                            />
                             {errorMessage && (
                                 <Rb_Text
                                     variant="small"
@@ -174,7 +204,7 @@ export default function CartItem({ item, errorMessage }: Props) {
                     <Rb_Button
                         className="!bg-red-500"
                         onClick={handleDelete}
-                        disabled={isPending}
+                        disabled={isDeletingItem}
                     >
                         Remove
                     </Rb_Button>

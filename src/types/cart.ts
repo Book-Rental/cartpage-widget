@@ -81,9 +81,20 @@ export interface ValidateCartResponse {
 
 export interface Address {
     _id: string;
-    line1: string;
-    line2?: string;
+    name: string;
+    type: string;
+    street: string;
     city: string;
     state: string;
-    pincode: string;
+    zipCode: string;
+    country: string;
+    phone: string;
+    isDefault?: boolean;
+}
+
+export interface UpdateCartQuantityPayload {
+    bookId: string;
+    quantity: number;
+    pricingMode: string;
+    rentalPeriod: string;
 }

@@ -25,11 +25,10 @@ vi.mock("../pages/CheckoutPage", () => ({
 vi.mock("../components/ReviewStep", () => ({
     default: ({ address }: { address: Address | null }) => (
         <div data-testid="review-step">
-            <div>{address?.line1}</div>
+            <div>{address?.street}</div>
         </div>
     ),
 }));
-
 vi.mock("../pages/AddressSelectionStep", () => ({
     default: ({
         onAddressSelected,
@@ -41,11 +40,16 @@ vi.mock("../pages/AddressSelectionStep", () => ({
                 onClick={() =>
                     onAddressSelected({
                         _id: "1",
-                        line1: "road no 2",
+                        name: "Geethika K",
+                        type: "work",
+                        street: "road no 2",
                         city: "Hyderabad",
                         state: "Telangana",
-                        pincode: "500096",
-                    } as Address)
+                        zipCode: "500096",
+                        country: "India",
+                        phone: "7867546789",
+                        isDefault: true,
+                    })
                 }
             >
                 Mock Select Address
@@ -278,9 +282,8 @@ describe("OrderSummary", () => {
         expect(
             screen.getByTestId("review-step")
         ).toBeInTheDocument();
-
         expect(
-            screen.getByText("road no 2")
+            screen.getByText(/road no 2/i)
         ).toBeInTheDocument();
     });
 
