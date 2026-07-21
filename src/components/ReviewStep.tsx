@@ -15,11 +15,31 @@ export default function ReviewStep({ summary, address }: Props) {
                 </Rb_Text>
 
                 {address ? (
-                    <Rb_Text className="text-sm text-gray-600">
-                        {address.line1}
-                        {address.line2 ? `, ${address.line2}` : ""}, {address.city},{" "}
-                        {address.state} - {address.pincode}
-                    </Rb_Text>
+                    <div className="space-y-1">
+                        <Rb_Text className="font-medium">
+                            {address.name}
+                        </Rb_Text>
+
+                        <Rb_Text className="text-sm text-gray-600">
+                            {address.street}
+                        </Rb_Text>
+
+                        <Rb_Text className="text-sm text-gray-600">
+                            {address.city}, {address.state} - {address.zipCode}
+                        </Rb_Text>
+
+                        <Rb_Text className="text-sm text-gray-600">
+                            {address.country}
+                        </Rb_Text>
+
+                        <Rb_Text className="text-sm text-gray-600">
+                            Phone: {address.phone}
+                        </Rb_Text>
+
+                        <Rb_Text className="text-xs text-gray-500 capitalize">
+                            {address.type} Address
+                        </Rb_Text>
+                    </div>
                 ) : (
                     <Rb_Text className="text-sm text-red-500">
                         No address selected

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import CartItem from "../components/CartItem";
 import { CartItemType } from "../types/cart";
@@ -27,16 +28,35 @@ interface MockDropdownProps {
     options: MockDropdownOption[];
 }
 
+interface MockQuantityProps {
+    value: number;
+    min?: number;
+    disabled?: boolean;
+    onChange: (value: number) => void;
+}
+
 interface DeleteMutateOptions {
     onSuccess: () => void;
     onError: () => void;
 }
 
-const mutateMock = vi.fn();
+interface UpdateQuantityMutateOptions {
+    onError?: () => void;
+}
+
+const deleteMutateMock = vi.fn();
+const updateQuantityMutateMock = vi.fn();
 
 vi.mock("../hooks/useDeleteCartItem", () => ({
     useDeleteCartItem: () => ({
-        mutate: mutateMock,
+        mutate: deleteMutateMock,
+        isPending: false,
+    }),
+}));
+
+vi.mock("../hooks/useUpdateCart", () => ({
+    useUpdateCartQuantity: () => ({
+        mutate: updateQuantityMutateMock,
         isPending: false,
     }),
 }));
@@ -44,7 +64,6 @@ vi.mock("../hooks/useDeleteCartItem", () => ({
 vi.mock("../utils/ToastFunction", () => ({
     showToast: vi.fn(),
 }));
-
 
 vi.mock("@rentbook/rentbook-ui-lib", async (importOriginal) => {
     const actual = await importOriginal<typeof import("@rentbook/rentbook-ui-lib")>();
@@ -80,6 +99,18 @@ vi.mock("@rentbook/rentbook-ui-lib", async (importOriginal) => {
                 ))}
             </select>
         ),
+        Rb_Quantity: ({ value, disabled, onChange }: MockQuantityProps) => (
+            <div data-testid="quantity">
+                <span>Qty: {value}</span>
+                <button
+                    data-testid="quantity-increment"
+                    disabled={disabled}
+                    onClick={() => onChange(value + 1)}
+                >
+                    +
+                </button>
+            </div>
+        ),
     };
 });
 
@@ -105,50 +136,90 @@ const buildItem = (overrides: Partial<CartItemType> = {}): CartItemType => ({
 
 const mockItem = buildItem();
 
+function renderWithClient(ui: React.ReactElement) {
+    const queryClient = new QueryClient();
+    return render(
+        <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+    );
+}
+
 describe("CartItem", () => {
     beforeEach(() => {
-        mutateMock.mockClear();
+        deleteMutateMock.mockClear();
+        updateQuantityMutateMock.mockClear();
         vi.mocked(showToast).mockClear();
     });
 
     it("renders the book name", () => {
-        render(<CartItem item={mockItem} />);
-
+        renderWithClient(<CartItem item={mockItem} />);
         expect(screen.getByText("Atomic Habits")).toBeInTheDocument();
     });
 
     it("renders the author name", () => {
-        render(<CartItem item={mockItem} />);
-
+        renderWithClient(<CartItem item={mockItem} />);
         expect(screen.getByText(/James Clear/i)).toBeInTheDocument();
     });
 
     it("renders the quantity", () => {
-        render(<CartItem item={mockItem} />);
+        renderWithClient(<CartItem item={mockItem} />);
+        expect(screen.getByTestId("quantity")).toBeInTheDocument();
+        expect(screen.getByText("Qty: 1")).toBeInTheDocument();
+    });
 
-        expect(screen.getByText(/Qty:/i)).toBeInTheDocument();
-        expect(screen.getByText("1")).toBeInTheDocument();
+    it("updates quantity and calls the mutation when changed", () => {
+        renderWithClient(<CartItem item={mockItem} />);
+
+        fireEvent.click(screen.getByTestId("quantity-increment"));
+
+        expect(screen.getByText("Qty: 2")).toBeInTheDocument();
+        expect(updateQuantityMutateMock).toHaveBeenCalledWith(
+            {
+                bookId: "1",
+                quantity: 2,
+                pricingMode: "rent",
+                rentalPeriod: "day",
+            },
+            expect.any(Object)
+        );
+    });
+
+    it("reverts quantity and shows an error toast if the update fails", async () => {
+        renderWithClient(<CartItem item={mockItem} />);
+
+        fireEvent.click(screen.getByTestId("quantity-increment"));
+        expect(screen.getByText("Qty: 2")).toBeInTheDocument();
+
+        const { onError } = updateQuantityMutateMock.mock
+            .calls[0][1] as UpdateQuantityMutateOptions;
+
+        await act(async () => {
+            onError?.();
+        });
+
+        await waitFor(() => {
+            expect(screen.getByText("Qty: 1")).toBeInTheDocument();
+        });
+
+        expect(showToast).toHaveBeenCalledWith(
+            "Failed to update quantity",
+            "error"
+        );
     });
 
     it("renders rental price for a daily rental", () => {
-        render(<CartItem item={mockItem} />);
-
+        renderWithClient(<CartItem item={mockItem} />);
         expect(screen.getByText("₹20")).toBeInTheDocument();
     });
 
     it("renders rental price for a weekly rental", () => {
         const weeklyItem = buildItem({ rentalPeriod: "week" });
-
-        render(<CartItem item={weeklyItem} />);
-
+        renderWithClient(<CartItem item={weeklyItem} />);
         expect(screen.getByText("₹100")).toBeInTheDocument();
     });
 
     it("renders rental price for a monthly rental", () => {
         const monthlyItem = buildItem({ rentalPeriod: "month" });
-
-        render(<CartItem item={monthlyItem} />);
-
+        renderWithClient(<CartItem item={monthlyItem} />);
         expect(screen.getByText("₹300")).toBeInTheDocument();
     });
 
@@ -156,100 +227,81 @@ describe("CartItem", () => {
         const unknownItem = buildItem({
             rentalPeriod: "year" as CartItemType["rentalPeriod"],
         });
-
-        render(<CartItem item={unknownItem} />);
-
+        renderWithClient(<CartItem item={unknownItem} />);
         expect(screen.getByText("₹0")).toBeInTheDocument();
     });
 
     it("renders security deposit", () => {
-        render(<CartItem item={mockItem} />);
-
+        renderWithClient(<CartItem item={mockItem} />);
         expect(screen.getByText("₹1000 deposit")).toBeInTheDocument();
     });
 
     it("renders duration dropdown", () => {
-        render(<CartItem item={mockItem} />);
-
+        renderWithClient(<CartItem item={mockItem} />);
         expect(screen.getByText("Duration")).toBeInTheDocument();
     });
 
     it("logs the new value when the duration dropdown changes", () => {
         const logSpy = vi.spyOn(console, "log").mockImplementation(() => { });
 
-        render(<CartItem item={mockItem} />);
+        renderWithClient(<CartItem item={mockItem} />);
 
         fireEvent.change(screen.getByTestId("dropdown"), {
             target: { value: "week" },
         });
 
         expect(logSpy).toHaveBeenCalledWith("week");
-
         logSpy.mockRestore();
     });
 
     it("opens remove modal", () => {
-        render(<CartItem item={mockItem} />);
+        renderWithClient(<CartItem item={mockItem} />);
 
         fireEvent.click(screen.getByTestId("rb-icon"));
 
         expect(screen.getByText("Remove Book")).toBeInTheDocument();
-
         expect(
             screen.getByText(/Are you sure you want to remove/i)
         ).toBeInTheDocument();
     });
 
     it("closes modal when cancel is clicked", () => {
-        render(<CartItem item={mockItem} />);
+        renderWithClient(<CartItem item={mockItem} />);
 
         fireEvent.click(screen.getByTestId("rb-icon"));
-
-        fireEvent.click(
-            screen.getByRole("button", {
-                name: /cancel/i,
-            })
-        );
+        fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
 
         expect(screen.queryByText("Remove Book")).not.toBeInTheDocument();
     });
 
     it("closes modal via the modal's onClose (backdrop)", () => {
-        render(<CartItem item={mockItem} />);
+        renderWithClient(<CartItem item={mockItem} />);
 
         fireEvent.click(screen.getByTestId("rb-icon"));
         expect(screen.getByText("Remove Book")).toBeInTheDocument();
 
         fireEvent.click(screen.getByTestId("modal-backdrop-close"));
-
         expect(screen.queryByText("Remove Book")).not.toBeInTheDocument();
     });
 
     it("closes modal via the modal header's onClose", () => {
-        render(<CartItem item={mockItem} />);
+        renderWithClient(<CartItem item={mockItem} />);
 
         fireEvent.click(screen.getByTestId("rb-icon"));
         expect(screen.getByText("Remove Book")).toBeInTheDocument();
 
         fireEvent.click(screen.getByTestId("modal-header-close"));
-
         expect(screen.queryByText("Remove Book")).not.toBeInTheDocument();
     });
 
     it("calls delete mutation when remove button is clicked", () => {
-        render(<CartItem item={mockItem} />);
+        renderWithClient(<CartItem item={mockItem} />);
 
         fireEvent.click(screen.getByTestId("rb-icon"));
+        fireEvent.click(screen.getByRole("button", { name: /remove/i }));
 
-        fireEvent.click(
-            screen.getByRole("button", {
-                name: /remove/i,
-            })
-        );
-
-        expect(mutateMock).toHaveBeenCalledTimes(1);
-
-        expect(mutateMock).toHaveBeenCalledWith(
+        expect(deleteMutateMock).toHaveBeenCalledTimes(1);
+        expect(deleteMutateMock).toHaveBeenCalledWith(
             {
                 bookId: "1",
                 pricingMode: "rent",
@@ -260,33 +312,30 @@ describe("CartItem", () => {
     });
 
     it("closes the modal and shows a success toast on successful delete", async () => {
-        render(<CartItem item={mockItem} />);
+        renderWithClient(<CartItem item={mockItem} />);
 
         fireEvent.click(screen.getByTestId("rb-icon"));
-
         expect(screen.getByText("Remove Book")).toBeInTheDocument();
 
         fireEvent.click(screen.getByRole("button", { name: /remove/i }));
 
-        const { onSuccess } = mutateMock.mock.calls[0][1] as DeleteMutateOptions;
-
+        const { onSuccess } = deleteMutateMock.mock.calls[0][1] as DeleteMutateOptions;
         onSuccess();
 
         await waitFor(() => {
             expect(screen.queryByText("Remove Book")).not.toBeInTheDocument();
         });
 
-        expect(showToast).toHaveBeenCalledWith(
-            "Atomic Habits removed from cart"
-        );
+        expect(showToast).toHaveBeenCalledWith("Atomic Habits removed from cart");
     });
+
     it("shows an error toast when delete fails", () => {
-        render(<CartItem item={mockItem} />);
+        renderWithClient(<CartItem item={mockItem} />);
 
         fireEvent.click(screen.getByTestId("rb-icon"));
         fireEvent.click(screen.getByRole("button", { name: /remove/i }));
 
-        const { onError } = mutateMock.mock.calls[0][1] as DeleteMutateOptions;
+        const { onError } = deleteMutateMock.mock.calls[0][1] as DeleteMutateOptions;
         onError();
 
         expect(showToast).toHaveBeenCalledWith(
