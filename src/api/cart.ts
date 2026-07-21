@@ -1,6 +1,6 @@
 import axios from "axios";
 import { endpoints } from "./api";
-import { CartData, CartResponse, RemoveCartItemPayload } from "../types/cart";
+import { CartData, CartResponse, RemoveCartItemPayload, ValidateCartResponse } from "../types/cart";
 
 export const fetchCart = async (): Promise<CartData> => {
 
@@ -10,6 +10,19 @@ export const fetchCart = async (): Promise<CartData> => {
     });
 
     return response.data.data;
+};
+
+
+export const validateCart = async () => {
+    const { data } = await axios.post<ValidateCartResponse>(
+        `${endpoints.cart}/validate`,
+        {},
+        {
+            withCredentials: true,
+        }
+    );
+
+    return data.data;
 };
 
 export const removeCartItem = async ({

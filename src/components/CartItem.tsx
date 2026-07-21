@@ -17,9 +17,10 @@ import { showToast } from "../utils/ToastFunction";
 
 interface Props {
     item: CartItemType;
+    errorMessage?: string;
 }
 
-export default function CartItem({ item }: Props) {
+export default function CartItem({ item, errorMessage }: Props) {
     const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
 
     const { mutate: deleteItem, isPending } = useDeleteCartItem();
@@ -58,7 +59,12 @@ export default function CartItem({ item }: Props) {
 
     return (
         <>
-            <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <div
+                className={`rounded-xl border bg-white p-4 ${errorMessage
+                        ? "border-red-300 bg-red-50/40"
+                        : "border-gray-200"
+                    }`}
+            >
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_170px_110px_40px] md:items-center">
 
                     <div className="flex items-center gap-4">
@@ -87,6 +93,15 @@ export default function CartItem({ item }: Props) {
                             >
                                 Qty: <span className="font-medium">{item.quantity}</span>
                             </Rb_Text>
+
+                            {errorMessage && (
+                                <Rb_Text
+                                    variant="small"
+                                    className="block mt-1 text-sm font-medium text-red-600"
+                                >
+                                    {errorMessage}
+                                </Rb_Text>
+                            )}
                         </div>
                     </div>
 
