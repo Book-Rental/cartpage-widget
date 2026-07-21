@@ -57,3 +57,33 @@ export interface RemoveCartItemPayload {
     pricingMode: "rent" | "buy";
     rentalPeriod: "day" | "week" | "month";
 }
+
+export interface InvalidCartItem {
+    bookId: string;
+    reason: string;
+}
+
+export interface ValidateCartData {
+    userId: string;
+    isValid: boolean;
+    invalidItems: InvalidCartItem[];
+    validationSummary: {
+        totalItems: number;
+        invalidCount: number;
+    };
+}
+
+export interface ValidateCartResponse {
+    status: string;
+    message: string;
+    data: ValidateCartData;
+}
+
+export interface Address {
+    _id: string;
+    line1: string;
+    line2?: string;
+    city: string;
+    state: string;
+    pincode: string;
+}
