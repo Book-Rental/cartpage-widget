@@ -44,8 +44,13 @@ interface UpdateQuantityMutateOptions {
     onError?: () => void;
 }
 
+interface UpdateRentalPeriodMutateOptions {
+    onError?: () => void;
+}
+
 const deleteMutateMock = vi.fn();
 const updateQuantityMutateMock = vi.fn();
+const updateRentalPeriodMutateMock = vi.fn();
 
 vi.mock("../hooks/useDeleteCartItem", () => ({
     useDeleteCartItem: () => ({
@@ -57,6 +62,13 @@ vi.mock("../hooks/useDeleteCartItem", () => ({
 vi.mock("../hooks/useUpdateCart", () => ({
     useUpdateCartQuantity: () => ({
         mutate: updateQuantityMutateMock,
+        isPending: false,
+    }),
+}));
+
+vi.mock("../hooks/useUpdateRentalPeriod", () => ({
+    useUpdateRentalPeriod: () => ({
+        mutate: updateRentalPeriodMutateMock,
         isPending: false,
     }),
 }));
@@ -147,6 +159,7 @@ describe("CartItem", () => {
     beforeEach(() => {
         deleteMutateMock.mockClear();
         updateQuantityMutateMock.mockClear();
+        updateRentalPeriodMutateMock.mockClear();
         vi.mocked(showToast).mockClear();
     });
 
@@ -241,17 +254,60 @@ describe("CartItem", () => {
         expect(screen.getByText("Duration")).toBeInTheDocument();
     });
 
-    it("logs the new value when the duration dropdown changes", () => {
-        const logSpy = vi.spyOn(console, "log").mockImplementation(() => { });
-
+    it("updates rental period and calls the mutation when changed", () => {
         renderWithClient(<CartItem item={mockItem} />);
 
         fireEvent.change(screen.getByTestId("dropdown"), {
             target: { value: "week" },
         });
 
-        expect(logSpy).toHaveBeenCalledWith("week");
-        logSpy.mockRestore();
+        expect(screen.getByTestId("dropdown")).toHaveValue("week");
+        expect(updateRentalPeriodMutateMock).toHaveBeenCalledWith(
+            {
+                bookId: "1",
+                pricingMode: "rent",
+                currentRentalPeriod: "day",
+                newRentalPeriod: "week",
+            },
+            expect.any(Object)
+        );
+    });
+
+    it("updates the displayed price optimistically when rental period changes", () => {
+        renderWithClient(<CartItem item={mockItem} />);
+
+        expect(screen.getByText("₹20")).toBeInTheDocument();
+
+        fireEvent.change(screen.getByTestId("dropdown"), {
+            target: { value: "month" },
+        });
+
+        expect(screen.getByText("₹300")).toBeInTheDocument();
+    });
+
+    it("reverts rental period and shows an error toast if the update fails", async () => {
+        renderWithClient(<CartItem item={mockItem} />);
+
+        fireEvent.change(screen.getByTestId("dropdown"), {
+            target: { value: "week" },
+        });
+        expect(screen.getByTestId("dropdown")).toHaveValue("week");
+
+        const { onError } = updateRentalPeriodMutateMock.mock
+            .calls[0][1] as UpdateRentalPeriodMutateOptions;
+
+        await act(async () => {
+            onError?.();
+        });
+
+        await waitFor(() => {
+            expect(screen.getByTestId("dropdown")).toHaveValue("day");
+        });
+
+        expect(showToast).toHaveBeenCalledWith(
+            "Failed to update rental period",
+            "error"
+        );
     });
 
     it("opens remove modal", () => {

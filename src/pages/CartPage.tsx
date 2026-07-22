@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
     Modal,
     ModalBody,
@@ -13,13 +13,11 @@ import OrderSummary from "../components/OrderSummary";
 import { useCart } from "../hooks/useCart";
 import { useClearCart } from "../hooks/useClearCart";
 import { showToast } from "../utils/ToastFunction";
-import { InvalidCartItem } from "../types/cart";
 
 export default function CartPage() {
     const { data, isLoading, isError } = useCart();
     const { mutate: clearCart, isPending } = useClearCart();
     const [isClearModalOpen, setClearModalOpen] = useState(false);
-    const [invalidItems, setInvalidItems] = useState<InvalidCartItem[]>([]);
 
     useEffect(() => {
         const event = new CustomEvent("widget-loading-status", {
@@ -28,21 +26,6 @@ export default function CartPage() {
         window.dispatchEvent(event);
     }, [isLoading]);
 
-    const currentBookIds = useMemo(
-        () => new Set((data?.items ?? []).map((i) => i.bookId._id)),
-        [data?.items]
-    );
-
-    const activeInvalidItems = useMemo(
-        () => invalidItems.filter((i) => currentBookIds.has(i.bookId)),
-        [invalidItems, currentBookIds]
-    );
-
-    const invalidItemsMap = useMemo(
-        () => new Map(activeInvalidItems.map((i) => [i.bookId, i.reason])),
-        [activeInvalidItems]
-    );
-
     if (isLoading) {
         return <Rb_LoadingSpinner text="Loading cart details..." />;
     }
@@ -50,15 +33,16 @@ export default function CartPage() {
     if (isError || !data) {
         return <div>Failed to load cart.</div>;
     }
+
     const handleBrowseBooks = () => {
         window.history.pushState({}, "", "/books");
         window.dispatchEvent(new PopStateEvent("popstate"));
     };
+
     const handleClearCart = () => {
         clearCart(undefined, {
             onSuccess: () => {
                 setClearModalOpen(false);
-                setInvalidItems([]);
                 showToast("Cart cleared successfully");
             },
             onError: () => {
@@ -87,14 +71,6 @@ export default function CartPage() {
                             </Rb_Button>
                         </div>
 
-                        {activeInvalidItems.length > 0 && (
-                            <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-                                {activeInvalidItems.length} item(s) in your
-                                cart are unavailable. Please review the
-                                highlighted book(s) below.
-                            </div>
-                        )}
-
                         {data.items.length === 0 ? (
                             <div className="flex flex-col items-center gap-4 py-10">
                                 <p className="text-gray-500">Your cart is empty.</p>
@@ -108,9 +84,6 @@ export default function CartPage() {
                                     <CartItem
                                         key={item.bookId._id}
                                         item={item}
-                                        errorMessage={invalidItemsMap.get(
-                                            item.bookId._id
-                                        )}
                                     />
                                 ))}
                             </div>
@@ -122,7 +95,6 @@ export default function CartPage() {
                     <OrderSummary
                         summary={data.summary}
                         itemCount={data.items.length}
-                        onValidationResult={setInvalidItems}
                     />
                 </div>
             </div>
