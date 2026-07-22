@@ -1,4 +1,9 @@
-import { render, waitFor, cleanup } from "@testing-library/react";
+import {
+    render,
+    waitFor,
+    cleanup,
+    act,
+} from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import CheckoutPage from "../pages/CheckoutPage";
 
@@ -7,8 +12,14 @@ describe("CheckoutPage", () => {
     const unmountReactWidgetMock = vi.fn();
 
     beforeEach(() => {
-        vi.stubEnv("VITE_PAYMENT_WIDGET_URL", "https://example.com/widget.js");
-        vi.stubEnv("VITE_RETURN_URL", "https://example.com/return");
+        vi.stubEnv(
+            "VITE_PAYMENT_WIDGET_URL",
+            "https://example.com/widget.js"
+        );
+        vi.stubEnv(
+            "VITE_RETURN_URL",
+            "https://example.com/return"
+        );
 
         window.renderReactWidget = renderReactWidgetMock;
         window.unmountReactWidget = unmountReactWidgetMock;
@@ -25,7 +36,9 @@ describe("CheckoutPage", () => {
     });
 
     it("renders the payment widget container", () => {
-        const { container } = render(<CheckoutPage totalAmount={250} />);
+        const { container } = render(
+            <CheckoutPage totalAmount={250} />
+        );
 
         expect(
             container.querySelector("#test-widget-container")
@@ -33,7 +46,9 @@ describe("CheckoutPage", () => {
     });
 
     it("sets all required data attributes", () => {
-        const { container } = render(<CheckoutPage totalAmount={500} />);
+        const { container } = render(
+            <CheckoutPage totalAmount={500} />
+        );
 
         const widget = container.querySelector(
             "#test-widget-container"
@@ -68,8 +83,45 @@ describe("CheckoutPage", () => {
         });
     });
 
+    it("handles payment success event", () => {
+        const logSpy = vi
+            .spyOn(console, "log")
+            .mockImplementation(() => { });
+
+        render(<CheckoutPage totalAmount={500} />);
+
+        act(() => {
+            window.dispatchEvent(
+                new CustomEvent("payment-widget-success", {
+                    detail: {
+                        status: "SUCCESS",
+                        amount: 500,
+                        currency: "INR",
+                        paymentMethod: "UPI",
+                        transactionId: "TXN123",
+                    },
+                })
+            );
+        });
+
+        expect(logSpy).toHaveBeenCalledWith(
+            "Payment completed successfully!",
+            {
+                status: "SUCCESS",
+                amount: 500,
+                currency: "INR",
+                paymentMethod: "UPI",
+                transactionId: "TXN123",
+            }
+        );
+
+        logSpy.mockRestore();
+    });
+
     it("cleans up on unmount", () => {
-        const { unmount } = render(<CheckoutPage totalAmount={100} />);
+        const { unmount } = render(
+            <CheckoutPage totalAmount={100} />
+        );
 
         const script = document.querySelector(
             'script[src="https://example.com/widget.js"]'
@@ -90,8 +142,40 @@ describe("CheckoutPage", () => {
         ).not.toBeInTheDocument();
     });
 
+    it("removes payment success listener on unmount", () => {
+        const logSpy = vi
+            .spyOn(console, "log")
+            .mockImplementation(() => { });
+
+        const { unmount } = render(
+            <CheckoutPage totalAmount={500} />
+        );
+
+        unmount();
+
+        act(() => {
+            window.dispatchEvent(
+                new CustomEvent("payment-widget-success", {
+                    detail: {
+                        status: "SUCCESS",
+                        amount: 500,
+                        currency: "INR",
+                        paymentMethod: "UPI",
+                        transactionId: "TXN123",
+                    },
+                })
+            );
+        });
+
+        expect(logSpy).not.toHaveBeenCalled();
+
+        logSpy.mockRestore();
+    });
+
     it("does not throw during cleanup if the script was already removed from the DOM", () => {
-        const { unmount } = render(<CheckoutPage totalAmount={100} />);
+        const { unmount } = render(
+            <CheckoutPage totalAmount={100} />
+        );
 
         const script = document.querySelector(
             'script[src="https://example.com/widget.js"]'
@@ -99,9 +183,6 @@ describe("CheckoutPage", () => {
 
         expect(script).toBeInTheDocument();
 
-        // Simulate the script already being removed by something else
-        // before this component unmounts (covers the false branch of
-        // `document.body.contains(script)` in the cleanup function).
         document.body.removeChild(script);
 
         expect(() => unmount()).not.toThrow();
@@ -116,7 +197,6 @@ describe("CheckoutPage", () => {
 
         render(<CheckoutPage totalAmount={100} />);
 
-        // Effect should have returned early, so no script should be appended
         expect(
             document.querySelector(
                 'script[src="https://example.com/widget.js"]'

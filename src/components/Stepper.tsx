@@ -12,7 +12,7 @@ export default function Stepper({ steps, currentStep }: StepperProps) {
     const currentIndex = steps.findIndex((s) => s.key === currentStep);
 
     return (
-        <div className="flex w-full items-center px-1 py-4">
+        <div className="flex w-full items-center py-2 sm:py-4">
             {steps.map((step, idx) => {
                 const isCompleted = idx < currentIndex;
                 const isActive = idx === currentIndex;
@@ -21,7 +21,7 @@ export default function Stepper({ steps, currentStep }: StepperProps) {
                     <div key={step.key} className="flex flex-1 items-center last:flex-none">
                         <div className="flex flex-col items-center">
                             <div
-                                className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold transition-colors
+                                className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold transition-colors sm:h-8 sm:w-8 sm:text-sm
                                     ${isCompleted
                                         ? "bg-green-500 text-white"
                                         : isActive
@@ -32,7 +32,7 @@ export default function Stepper({ steps, currentStep }: StepperProps) {
                                 {isCompleted ? "✓" : idx + 1}
                             </div>
                             <span
-                                className={`mt-1 whitespace-nowrap text-xs ${isActive ? "font-semibold text-gray-900" : "text-gray-500"
+                                className={`mt-1 whitespace-nowrap text-[10px] sm:text-xs ${isActive ? "font-semibold text-gray-900" : "text-gray-500"
                                     }`}
                             >
                                 {step.label}
@@ -41,7 +41,7 @@ export default function Stepper({ steps, currentStep }: StepperProps) {
 
                         {idx < steps.length - 1 && (
                             <div
-                                className={`mx-2 h-0.5 flex-1 ${isCompleted ? "bg-green-500" : "bg-gray-200"
+                                className={`mx-1 h-0.5 flex-1 sm:mx-2 ${isCompleted ? "bg-green-500" : "bg-gray-200"
                                     }`}
                             />
                         )}

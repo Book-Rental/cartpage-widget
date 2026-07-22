@@ -16,6 +16,7 @@ import { CartItemType } from "../types/cart";
 import { useDeleteCartItem } from "../hooks/useDeleteCartItem";
 import { showToast } from "../utils/ToastFunction";
 import { useUpdateCartQuantity } from "../hooks/useUpdateCart";
+import { useUpdateRentalPeriod } from "../hooks/useUpdateRentalPeriod";
 
 interface Props {
     item: CartItemType;
@@ -30,16 +31,27 @@ export default function CartItem({ item, errorMessage }: Props) {
     } = useUpdateCartQuantity();
     const [quantity, setQuantity] = useState(item.quantity);
 
+    const {
+        mutate: updateRentalPeriod,
+        isPending: isUpdatingRentalPeriod,
+    } = useUpdateRentalPeriod();
+    const [rentalPeriod, setRentalPeriod] = useState(item.rentalPeriod);
+
     useEffect(() => {
         setQuantity(item.quantity);
     }, [item.quantity]);
+
+    useEffect(() => {
+        setRentalPeriod(item.rentalPeriod);
+    }, [item.rentalPeriod]);
 
     const {
         mutate: deleteItem,
         isPending: isDeletingItem,
     } = useDeleteCartItem();
+
     const getRentalPrice = () => {
-        switch (item.rentalPeriod) {
+        switch (rentalPeriod) {
             case "day":
                 return item.bookId.rentalPricePerDay;
             case "week":
@@ -49,6 +61,26 @@ export default function CartItem({ item, errorMessage }: Props) {
             default:
                 return 0;
         }
+    };
+
+    const handleRentalPeriodChange = (newRentalPeriod: string) => {
+        const previousRentalPeriod = rentalPeriod;
+        setRentalPeriod(newRentalPeriod as CartItemType["rentalPeriod"]);
+
+        updateRentalPeriod(
+            {
+                bookId: item.bookId._id,
+                pricingMode: item.pricingMode,
+                currentRentalPeriod: previousRentalPeriod,
+                newRentalPeriod,
+            },
+            {
+                onError: () => {
+                    setRentalPeriod(previousRentalPeriod);
+                    showToast("Failed to update rental period", "error");
+                },
+            }
+        );
     };
 
     const handleDelete = () => {
@@ -144,8 +176,9 @@ export default function CartItem({ item, errorMessage }: Props) {
                         </Rb_Text>
 
                         <Dropdown
-                            value={item.rentalPeriod}
-                            onChange={(value) => console.log(value)}
+                            value={rentalPeriod}
+                            disabled={isUpdatingRentalPeriod}
+                            onChange={handleRentalPeriodChange}
                             options={[
                                 { label: "Day", value: "day" },
                                 { label: "Week", value: "week" },

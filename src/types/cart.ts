@@ -98,3 +98,9 @@ export interface UpdateCartQuantityPayload {
     pricingMode: string;
     rentalPeriod: string;
 }
+export interface UpdateRentalPeriodPayload {
+    bookId: string;
+    pricingMode: string;
+    currentRentalPeriod: string;
+    newRentalPeriod: string;
+}
