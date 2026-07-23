@@ -28,6 +28,7 @@ export interface SummaryItem {
 }
 
 export interface CartSummary {
+
     subtotal: number;
     securityDepositTotal: number;
     deliveryFee: number;
@@ -80,16 +81,16 @@ export interface ValidateCartResponse {
 }
 
 export interface Address {
-    _id: string;
     name: string;
-    type: string;
-    street: string;
+    phone: string;
+    type: "home" | "work" | "other"; // Enforces your specific schema enum types
+    addressLine1: string;
+    addressLine2?: string; // Optional field field guard
+    landmark?: string;    // Optional field field guard
     city: string;
     state: string;
-    zipCode: string;
+    pincode: string;
     country: string;
-    phone: string;
-    isDefault?: boolean;
 }
 
 export interface UpdateCartQuantityPayload {

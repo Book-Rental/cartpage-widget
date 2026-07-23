@@ -1,17 +1,22 @@
 import { useCallback, useEffect, useState } from "react";
-import { Rb_Button, Rb_LoadingSpinner, Rb_Text } from "@rentbook/rentbook-ui-lib";
+import {
+    Rb_Button,
+    Rb_LoadingSpinner,
+    Rb_Text,
+} from "@rentbook/rentbook-ui-lib";
 import { FaArrowLeft } from "react-icons/fa";
 
 import { useCart } from "../hooks/useCart";
 import { useValidateCart } from "../hooks/useValidateCart";
-import { Address, InvalidCartItem } from "../types/cart";
+import { InvalidCartItem } from "../types/cart";
+
 import Stepper from "../components/Stepper";
 import AddressSelectionStep from "./AddressSelectionStep";
-import PaymentWidgetPage from "./CheckoutPage";
-import { showToast } from "../utils/ToastFunction";
 import ReviewStep from "../components/ReviewStep";
+import PaymentWidgetPage from "./CheckoutPage";
 
-type CheckoutStep = "validation" | "address" | "review" | "payment";
+import { showToast } from "../utils/ToastFunction";
+import { useCheckout } from "../hooks/CheckoutContext";
 
 const STEPS = [
     { key: "validation", label: "Validation" },
@@ -27,14 +32,42 @@ function navigateTo(path: string) {
 
 export default function CheckoutFlowPage() {
     const { data, isLoading: isCartLoading } = useCart();
-    const [step, setStep] = useState<CheckoutStep>("validation");
-    const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
+
+    const {
+        step,
+        setStep,
+        checkoutData,
+        setCheckoutData,
+    } = useCheckout();
+
     const [invalidItems, setInvalidItems] = useState<InvalidCartItem[]>([]);
 
     const { mutate: validateCart, isPending } = useValidateCart();
 
+    useEffect(() => {
+        if (!data) return;
+        // eslint-disable-next-line  @typescript-eslint/no-explicit-any
+        setCheckoutData((prev: any) => ({
+            ...prev,
+            userId: data.userId,
+            items: data.items.map((item) => ({
+                bookId: item.bookId._id,
+                quantity: item.quantity,
+                rentalType: item.rentalPeriod,
+            })),
+            amount: {
+                rentalAmount: data.summary.subtotal,
+                securityDeposit: data.summary.securityDepositTotal,
+                deliveryFee: data.summary.deliveryFee,
+                discount: 0,
+                tax: data.summary.tax,
+                totalAmount: data.summary.total,
+            },
+        }));
+    }, [data, setCheckoutData]);
     const runValidation = useCallback(() => {
         setStep("validation");
+
         validateCart(undefined, {
             onSuccess: ({ isValid, invalidItems }) => {
                 setInvalidItems(invalidItems);
@@ -42,21 +75,29 @@ export default function CheckoutFlowPage() {
                 if (isValid) {
                     setStep("address");
                 } else {
-                    showToast("Some items in your cart are invalid", "error");
+                    showToast(
+                        "Some items in your cart are invalid",
+                        "error"
+                    );
                 }
             },
             onError: () => {
-                showToast("Failed to validate cart", "error");
+                showToast(
+                    "Failed to validate cart",
+                    "error"
+                );
             },
         });
-    }, [validateCart]);
+    }, [validateCart, setStep]);
 
     useEffect(() => {
         runValidation();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const handleBackToCart = () => navigateTo("/");
+    const handleBackToCart = () => {
+        navigateTo("/");
+    };
 
     if (isCartLoading) {
         return (
@@ -66,15 +107,18 @@ export default function CheckoutFlowPage() {
         );
     }
 
-    // Map invalid bookIds -> book name, using data already fetched from useCart
     const invalidItemDetails = invalidItems.map((invalid) => {
-        const cartItem = data?.items.find((i) => i.bookId._id === invalid.bookId);
+        const cartItem = data?.items.find(
+            (item) => item.bookId._id === invalid.bookId
+        );
+
         return {
             bookId: invalid.bookId,
             reason: invalid.reason,
             name: cartItem?.bookId.name ?? "Unknown item",
         };
     });
+
 
     return (
         <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
@@ -86,7 +130,10 @@ export default function CheckoutFlowPage() {
             </Rb_Text>
 
             <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6 lg:p-8">
-                <Stepper steps={STEPS} currentStep={step} />
+                <Stepper
+                    steps={STEPS}
+                    currentStep={step}
+                />
 
                 <div className="mt-6 sm:mt-8">
                     {step === "validation" && (
@@ -102,15 +149,19 @@ export default function CheckoutFlowPage() {
                                     {invalidItemDetails.length > 0 && (
                                         <div className="w-full max-w-md rounded-lg border border-red-200 bg-red-50 p-4 text-left">
                                             <Rb_Text className="mb-2 text-sm font-semibold text-red-600">
-                                                {invalidItemDetails.length} item(s) unavailable:
+                                                {invalidItemDetails.length} item(s)
+                                                unavailable:
                                             </Rb_Text>
+
                                             <ul className="space-y-1.5">
                                                 {invalidItemDetails.map((item) => (
                                                     <li
                                                         key={item.bookId}
                                                         className="text-sm leading-snug text-red-600"
                                                     >
-                                                        <span className="font-medium">{item.name}</span>
+                                                        <span className="font-medium">
+                                                            {item.name}
+                                                        </span>
                                                         {" — "}
                                                         {item.reason}
                                                     </li>
@@ -120,9 +171,13 @@ export default function CheckoutFlowPage() {
                                     )}
 
                                     <div className="mt-2 flex w-full max-w-md flex-col gap-3 sm:flex-row sm:justify-center">
-                                        <Rb_Button className="w-full sm:w-auto" onClick={runValidation}>
+                                        <Rb_Button
+                                            className="w-full sm:w-auto"
+                                            onClick={runValidation}
+                                        >
                                             Retry Validation
                                         </Rb_Button>
+
                                         <Rb_Button
                                             variant="secondary"
                                             className="w-full sm:w-auto"
@@ -138,7 +193,7 @@ export default function CheckoutFlowPage() {
 
                     {step === "address" && (
                         <>
-                            <AddressSelectionStep onAddressSelected={setSelectedAddress} />
+                            <AddressSelectionStep />
 
                             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                                 <Rb_Button
@@ -148,9 +203,10 @@ export default function CheckoutFlowPage() {
                                 >
                                     Cancel
                                 </Rb_Button>
+
                                 <Rb_Button
                                     className="w-full sm:w-auto"
-                                    disabled={!selectedAddress}
+                                    disabled={!checkoutData.shippingAddress}
                                     onClick={() => setStep("review")}
                                 >
                                     Continue to Review
@@ -158,8 +214,7 @@ export default function CheckoutFlowPage() {
                             </div>
                         </>
                     )}
-
-                    {step === "review" && data && (
+                    {step === "review" && checkoutData.amount && (
                         <>
                             <Rb_Button
                                 variant="outline"
@@ -171,7 +226,7 @@ export default function CheckoutFlowPage() {
                                 Back to Address
                             </Rb_Button>
 
-                            <ReviewStep summary={data.summary} address={selectedAddress} />
+                            <ReviewStep />
 
                             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                                 <Rb_Button
@@ -181,6 +236,7 @@ export default function CheckoutFlowPage() {
                                 >
                                     Cancel
                                 </Rb_Button>
+
                                 <Rb_Button
                                     className="w-full sm:w-auto"
                                     onClick={() => setStep("payment")}
@@ -191,7 +247,7 @@ export default function CheckoutFlowPage() {
                         </>
                     )}
 
-                    {step === "payment" && data && (
+                    {step === "payment" && checkoutData.amount && (
                         <>
                             <Rb_Button
                                 variant="outline"
@@ -203,7 +259,7 @@ export default function CheckoutFlowPage() {
                                 Back to Review
                             </Rb_Button>
 
-                            <PaymentWidgetPage totalAmount={data.summary.total} />
+                            <PaymentWidgetPage />
                         </>
                     )}
                 </div>

@@ -1,15 +1,19 @@
 import { useEffect } from "react";
+import { useCheckout } from "../hooks/CheckoutContext";
+import { usePlaceOrder } from "../hooks/usePlaceOrder";
 
-interface CheckoutPageProps {
-    totalAmount?: number;
-}
-
-const CheckoutPage: React.FC<CheckoutPageProps> = ({ totalAmount }) => {
+const CheckoutPage: React.FC = () => {
     const paymentWidgetUrl = import.meta.env.VITE_PAYMENT_WIDGET_URL;
     const returnUrl = import.meta.env.VITE_RETURN_URL;
 
+    const { checkoutData, setCheckoutData } = useCheckout();
+
+    const totalAmount = checkoutData.amount?.totalAmount ?? 0;
+    const { mutate: placeOrder } = usePlaceOrder();
     // Load Payment Widget
     useEffect(() => {
+        if (!paymentWidgetUrl) return;
+
         const containerId = "test-widget-container";
 
         const container = document.getElementById(containerId);
@@ -65,8 +69,27 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ totalAmount }) => {
                 paymentMethod,
                 transactionId,
             });
+            // eslint-disable-next-line  @typescript-eslint/no-explicit-any
+            const payment = {
+                paymentMethod,
+                transactionId,
+            };
 
+            const payload = {
+                ...checkoutData,
+                payment,
+            };
 
+            setCheckoutData(payload);
+
+            placeOrder(payload, {
+                onSuccess: () => {
+                    console.log("Order placed successfully");
+                },
+                onError: () => {
+                    console.log("Order placement failed");
+                },
+            });
         };
 
         window.addEventListener(
@@ -80,7 +103,12 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ totalAmount }) => {
                 handlePaymentSuccess
             );
         };
-    }, []);
+    }, [setCheckoutData]);
+
+    // Debug - Remove this after testing
+    useEffect(() => {
+        console.log("Checkout Payload", checkoutData);
+    }, [checkoutData]);
 
     return (
         <div
