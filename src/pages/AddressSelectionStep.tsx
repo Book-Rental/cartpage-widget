@@ -1,18 +1,16 @@
 import { useEffect, useState } from "react";
 import { Rb_LoadingSpinner } from "@rentbook/rentbook-ui-lib";
+
 import { Address } from "../types/cart";
+import { useCheckout } from "../hooks/CheckoutContext";
 
 const PROFILE_WIDGET_URL = import.meta.env.VITE_PROFILE_WIDGET;
 const WIDGET_CONTAINER_ID = "profile-widget";
 
-interface Props {
-    onAddressSelected: (address: Address) => void;
-}
-
-export default function AddressSelectionStep({
-    onAddressSelected,
-}: Props) {
+export default function AddressSelectionStep() {
     const [isLoading, setIsLoading] = useState(true);
+
+    const { setCheckoutData } = useCheckout();
 
     useEffect(() => {
         if (!PROFILE_WIDGET_URL) return;
@@ -31,9 +29,16 @@ export default function AddressSelectionStep({
         const handleAddressSelected = (event: Event) => {
             const customEvent = event as CustomEvent<Address>;
 
-            console.log("Selected Address:", customEvent.detail);
+            const selectedAddress = customEvent.detail;
 
-            onAddressSelected(customEvent.detail);
+            console.log("Selected Address:", selectedAddress);
+
+            // eslint-disable-next-line  @typescript-eslint/no-explicit-any
+            setCheckoutData((prev: any) => ({
+                ...prev,
+                shippingAddress: selectedAddress,
+                billingAddress: selectedAddress, // Same as shipping for now
+            }));
         };
 
         window.addEventListener(
@@ -51,6 +56,10 @@ export default function AddressSelectionStep({
         script.async = true;
 
         script.onload = () => {
+            window.HOST_USER_INFO = {
+                _id: "6a3bbe38827e96ec21dcb390",
+            };
+
             window.renderReactWidget?.(
                 JSON.stringify({
                     containerElementId: WIDGET_CONTAINER_ID,
@@ -79,7 +88,7 @@ export default function AddressSelectionStep({
                 handleAddressSelected
             );
         };
-    }, [onAddressSelected]);
+    }, [setCheckoutData]);
 
     return (
         <div className="relative min-h-[400px] w-full">
