@@ -6,6 +6,58 @@ import {
 } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import CheckoutPage from "../pages/CheckoutPage";
+import * as CheckoutContextModule from "../hooks/CheckoutContext";
+import * as usePlaceOrderModule from "../hooks/usePlaceOrder";
+
+vi.mock("../hooks/CheckoutContext", async () => {
+    const actual = await vi.importActual<
+        typeof import("../hooks/CheckoutContext")
+    >("../hooks/CheckoutContext");
+    return {
+        ...actual,
+        useCheckout: vi.fn(),
+    };
+});
+
+vi.mock("../hooks/usePlaceOrder", () => ({
+    usePlaceOrder: vi.fn(),
+}));
+
+const mockUseCheckout = vi.mocked(CheckoutContextModule.useCheckout);
+const mockUsePlaceOrder = vi.mocked(usePlaceOrderModule.usePlaceOrder);
+
+const setCheckoutDataMock = vi.fn();
+const placeOrderMock = vi.fn();
+
+const makeCheckoutData = (totalAmount: number) => ({
+    userId: "",
+    items: [],
+    shippingAddress: null,
+    billingAddress: null,
+    payment: null,
+    amount: {
+        rentalAmount: 0,
+        securityDeposit: 0,
+        deliveryFee: 0,
+        discount: 0,
+        tax: 0,
+        totalAmount,
+    },
+});
+
+// Renders CheckoutPage with the context pre-seeded to a given totalAmount,
+// standing in for the old `<CheckoutPage totalAmount={n} />` usage.
+const renderCheckoutPage = (totalAmount: number) => {
+    mockUseCheckout.mockReturnValue({
+        step: "payment",
+        setStep: vi.fn(),
+        checkoutData: makeCheckoutData(totalAmount),
+        setCheckoutData: setCheckoutDataMock,
+        resetCheckout: vi.fn(),
+    });
+
+    return render(<CheckoutPage />);
+};
 
 describe("CheckoutPage", () => {
     const renderReactWidgetMock = vi.fn();
@@ -26,6 +78,12 @@ describe("CheckoutPage", () => {
 
         renderReactWidgetMock.mockClear();
         unmountReactWidgetMock.mockClear();
+        setCheckoutDataMock.mockClear();
+        placeOrderMock.mockClear();
+
+        mockUsePlaceOrder.mockReturnValue({
+            mutate: placeOrderMock,
+        } as unknown as ReturnType<typeof usePlaceOrderModule.usePlaceOrder>);
     });
 
     afterEach(() => {
@@ -36,9 +94,7 @@ describe("CheckoutPage", () => {
     });
 
     it("renders the payment widget container", () => {
-        const { container } = render(
-            <CheckoutPage totalAmount={250} />
-        );
+        const { container } = renderCheckoutPage(250);
 
         expect(
             container.querySelector("#test-widget-container")
@@ -46,9 +102,7 @@ describe("CheckoutPage", () => {
     });
 
     it("sets all required data attributes", () => {
-        const { container } = render(
-            <CheckoutPage totalAmount={500} />
-        );
+        const { container } = renderCheckoutPage(500);
 
         const widget = container.querySelector(
             "#test-widget-container"
@@ -64,7 +118,7 @@ describe("CheckoutPage", () => {
     });
 
     it("loads the payment widget script and calls renderReactWidget", async () => {
-        render(<CheckoutPage totalAmount={100} />);
+        renderCheckoutPage(100);
 
         const script = document.querySelector(
             'script[src="https://example.com/widget.js"]'
@@ -88,7 +142,7 @@ describe("CheckoutPage", () => {
             .spyOn(console, "log")
             .mockImplementation(() => { });
 
-        render(<CheckoutPage totalAmount={500} />);
+        renderCheckoutPage(500);
 
         act(() => {
             window.dispatchEvent(
@@ -118,10 +172,68 @@ describe("CheckoutPage", () => {
         logSpy.mockRestore();
     });
 
+    it("logs a success message when placeOrder succeeds", () => {
+        const logSpy = vi
+            .spyOn(console, "log")
+            .mockImplementation(() => { });
+
+        placeOrderMock.mockImplementation((_payload, options) => {
+            options?.onSuccess?.();
+        });
+
+        renderCheckoutPage(500);
+
+        act(() => {
+            window.dispatchEvent(
+                new CustomEvent("payment-widget-success", {
+                    detail: {
+                        status: "SUCCESS",
+                        amount: 500,
+                        currency: "INR",
+                        paymentMethod: "UPI",
+                        transactionId: "TXN123",
+                    },
+                })
+            );
+        });
+
+        expect(logSpy).toHaveBeenCalledWith("Order placed successfully");
+
+        logSpy.mockRestore();
+    });
+
+    it("logs a failure message when placeOrder fails", () => {
+        const logSpy = vi
+            .spyOn(console, "log")
+            .mockImplementation(() => { });
+
+        placeOrderMock.mockImplementation((_payload, options) => {
+            options?.onError?.();
+        });
+
+        renderCheckoutPage(500);
+
+        act(() => {
+            window.dispatchEvent(
+                new CustomEvent("payment-widget-success", {
+                    detail: {
+                        status: "SUCCESS",
+                        amount: 500,
+                        currency: "INR",
+                        paymentMethod: "UPI",
+                        transactionId: "TXN123",
+                    },
+                })
+            );
+        });
+
+        expect(logSpy).toHaveBeenCalledWith("Order placement failed");
+
+        logSpy.mockRestore();
+    });
+
     it("cleans up on unmount", () => {
-        const { unmount } = render(
-            <CheckoutPage totalAmount={100} />
-        );
+        const { unmount } = renderCheckoutPage(100);
 
         const script = document.querySelector(
             'script[src="https://example.com/widget.js"]'
@@ -147,9 +259,11 @@ describe("CheckoutPage", () => {
             .spyOn(console, "log")
             .mockImplementation(() => { });
 
-        const { unmount } = render(
-            <CheckoutPage totalAmount={500} />
-        );
+        const { unmount } = renderCheckoutPage(500);
+
+        // Clear out the mount-time "Checkout Payload" debug log so this
+        // assertion only reflects behavior after unmount.
+        logSpy.mockClear();
 
         unmount();
 
@@ -167,15 +281,16 @@ describe("CheckoutPage", () => {
             );
         });
 
-        expect(logSpy).not.toHaveBeenCalled();
+        expect(logSpy).not.toHaveBeenCalledWith(
+            "Payment completed successfully!",
+            expect.anything()
+        );
 
         logSpy.mockRestore();
     });
 
     it("does not throw during cleanup if the script was already removed from the DOM", () => {
-        const { unmount } = render(
-            <CheckoutPage totalAmount={100} />
-        );
+        const { unmount } = renderCheckoutPage(100);
 
         const script = document.querySelector(
             'script[src="https://example.com/widget.js"]'
@@ -195,7 +310,7 @@ describe("CheckoutPage", () => {
     it("does nothing and does not inject the script if the widget container is not found", () => {
         vi.spyOn(document, "getElementById").mockReturnValue(null);
 
-        render(<CheckoutPage totalAmount={100} />);
+        renderCheckoutPage(100);
 
         expect(
             document.querySelector(
