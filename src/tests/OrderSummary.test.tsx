@@ -57,11 +57,13 @@ describe("OrderSummary", () => {
     });
 
     afterEach(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         delete (window as any).HOST_USER_INFO;
     });
 
     describe("when user is logged in", () => {
         beforeEach(() => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (window as any).HOST_USER_INFO = { _id: "user1", name: "Test" };
         });
 
@@ -161,6 +163,7 @@ describe("OrderSummary", () => {
 
     describe("when user is NOT logged in", () => {
         beforeEach(() => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (window as any).HOST_USER_INFO = undefined;
         });
 
