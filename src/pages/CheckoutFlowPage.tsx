@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+    Modal,
+    ModalBody,
+    ModalFooter,
+    ModalHeader,
     Rb_Button,
     Rb_LoadingSpinner,
     Rb_Text,
@@ -19,7 +23,6 @@ import { showToast } from "../utils/ToastFunction";
 import { useCheckout } from "../hooks/CheckoutContext";
 
 const STEPS = [
-    { key: "validation", label: "Validation" },
     { key: "address", label: "Address" },
     { key: "review", label: "Review" },
     { key: "payment", label: "Payment" },
@@ -40,10 +43,12 @@ export default function CheckoutFlowPage() {
         setCheckoutData,
     } = useCheckout();
 
+
     const [invalidItems, setInvalidItems] = useState<InvalidCartItem[]>([]);
 
-    const { mutate: validateCart, isPending } = useValidateCart();
-
+    const { mutate: validateCart } = useValidateCart();
+    const [isValidationModalOpen, setValidationModalOpen] =
+        useState(false);
     useEffect(() => {
         if (!data) return;
         // eslint-disable-next-line  @typescript-eslint/no-explicit-any
@@ -66,8 +71,6 @@ export default function CheckoutFlowPage() {
         }));
     }, [data, setCheckoutData]);
     const runValidation = useCallback(() => {
-        setStep("validation");
-
         validateCart(undefined, {
             onSuccess: ({ isValid, invalidItems }) => {
                 setInvalidItems(invalidItems);
@@ -75,20 +78,14 @@ export default function CheckoutFlowPage() {
                 if (isValid) {
                     setStep("address");
                 } else {
-                    showToast(
-                        "Some items in your cart are invalid",
-                        "error"
-                    );
+                    setValidationModalOpen(true);
                 }
             },
             onError: () => {
-                showToast(
-                    "Failed to validate cart",
-                    "error"
-                );
+                showToast("Failed to validate cart", "error");
             },
         });
-    }, [validateCart, setStep]);
+    }, [validateCart, setStep]);;
 
     useEffect(() => {
         runValidation();
@@ -96,7 +93,7 @@ export default function CheckoutFlowPage() {
     }, []);
 
     const handleBackToCart = () => {
-        navigateTo("/");
+        navigateTo("/cart");
     };
 
     if (isCartLoading) {
@@ -136,60 +133,7 @@ export default function CheckoutFlowPage() {
                 />
 
                 <div className="mt-6 sm:mt-8">
-                    {step === "validation" && (
-                        <div className="flex min-h-[280px] flex-col items-center justify-center gap-4 py-6 text-center sm:min-h-[320px]">
-                            {isPending ? (
-                                <Rb_LoadingSpinner text="Validating your cart..." />
-                            ) : (
-                                <>
-                                    <Rb_Text className="text-base font-medium text-red-500">
-                                        Validation failed. Please retry.
-                                    </Rb_Text>
 
-                                    {invalidItemDetails.length > 0 && (
-                                        <div className="w-full max-w-md rounded-lg border border-red-200 bg-red-50 p-4 text-left">
-                                            <Rb_Text className="mb-2 text-sm font-semibold text-red-600">
-                                                {invalidItemDetails.length} item(s)
-                                                unavailable:
-                                            </Rb_Text>
-
-                                            <ul className="space-y-1.5">
-                                                {invalidItemDetails.map((item) => (
-                                                    <li
-                                                        key={item.bookId}
-                                                        className="text-sm leading-snug text-red-600"
-                                                    >
-                                                        <span className="font-medium">
-                                                            {item.name}
-                                                        </span>
-                                                        {" — "}
-                                                        {item.reason}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    )}
-
-                                    <div className="mt-2 flex w-full max-w-md flex-col gap-3 sm:flex-row sm:justify-center">
-                                        <Rb_Button
-                                            className="w-full sm:w-auto"
-                                            onClick={runValidation}
-                                        >
-                                            Retry Validation
-                                        </Rb_Button>
-
-                                        <Rb_Button
-                                            variant="secondary"
-                                            className="w-full sm:w-auto"
-                                            onClick={handleBackToCart}
-                                        >
-                                            Back to Cart
-                                        </Rb_Button>
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    )}
 
                     {step === "address" && (
                         <>
@@ -264,6 +208,52 @@ export default function CheckoutFlowPage() {
                     )}
                 </div>
             </div>
+            <Modal
+                isOpen={isValidationModalOpen}
+                onClose={() => setValidationModalOpen(false)}
+            >
+                <ModalHeader
+
+                    onClose={() => setValidationModalOpen(false)}
+                >
+                    Cart Validation Failed
+                </ModalHeader>
+
+                <ModalBody>
+                    <Rb_Text className="mb-4 text-red-500 font-medium">
+                        Some items in your cart are unavailable.
+                    </Rb_Text>
+
+                    <ul className="space-y-2">
+                        {invalidItemDetails.map((item) => (
+                            <li key={item.bookId}>
+                                <strong>{item.name}</strong> — {item.reason}
+                            </li>
+                        ))}
+                    </ul>
+                </ModalBody>
+
+                <ModalFooter>
+                    <Rb_Button
+                        variant="secondary"
+                        onClick={() => {
+                            setValidationModalOpen(false);
+                            handleBackToCart();
+                        }}
+                    >
+                        Back to Cart
+                    </Rb_Button>
+
+                    <Rb_Button
+                        onClick={() => {
+                            setValidationModalOpen(false);
+                            runValidation();
+                        }}
+                    >
+                        Retry
+                    </Rb_Button>
+                </ModalFooter>
+            </Modal>
         </div>
     );
 }

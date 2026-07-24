@@ -41,6 +41,7 @@ interface DeleteMutateOptions {
 }
 
 interface UpdateQuantityMutateOptions {
+    onSuccess?: () => void;
     onError?: () => void;
 }
 
@@ -219,6 +220,37 @@ describe("CartItem", () => {
         );
     });
 
+    it("calls onValidationSuccess when the quantity update succeeds", () => {
+        const onValidationSuccessMock = vi.fn();
+
+        renderWithClient(
+            <CartItem
+                item={mockItem}
+                onValidationSuccess={onValidationSuccessMock}
+            />
+        );
+
+        fireEvent.click(screen.getByTestId("quantity-increment"));
+
+        const { onSuccess } = updateQuantityMutateMock.mock
+            .calls[0][1] as UpdateQuantityMutateOptions;
+
+        onSuccess?.();
+
+        expect(onValidationSuccessMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not throw when the quantity update succeeds and onValidationSuccess was not provided", () => {
+        renderWithClient(<CartItem item={mockItem} />);
+
+        fireEvent.click(screen.getByTestId("quantity-increment"));
+
+        const { onSuccess } = updateQuantityMutateMock.mock
+            .calls[0][1] as UpdateQuantityMutateOptions;
+
+        expect(() => onSuccess?.()).not.toThrow();
+    });
+
     it("renders rental price for a daily rental", () => {
         renderWithClient(<CartItem item={mockItem} />);
         expect(screen.getByText("₹20")).toBeInTheDocument();
@@ -308,6 +340,37 @@ describe("CartItem", () => {
             "Failed to update rental period",
             "error"
         );
+    });
+
+    it("does not display an error message when none is provided", () => {
+        renderWithClient(<CartItem item={mockItem} />);
+        expect(screen.queryByText(/unavailable|out of stock/i)).not.toBeInTheDocument();
+    });
+
+    it("displays the error message when provided", () => {
+        renderWithClient(
+            <CartItem item={mockItem} errorMessage="Only 1 left in stock" />
+        );
+
+        expect(screen.getByText("Only 1 left in stock")).toBeInTheDocument();
+    });
+
+    it("applies error styling to the card when an error message is provided", () => {
+        const { container } = renderWithClient(
+            <CartItem item={mockItem} errorMessage="Only 1 left in stock" />
+        );
+
+        const card = container.querySelector(".rounded-xl.border");
+        expect(card).toHaveClass("border-red-300");
+        expect(card).toHaveClass("bg-red-50/40");
+    });
+
+    it("does not apply error styling to the card when no error message is provided", () => {
+        const { container } = renderWithClient(<CartItem item={mockItem} />);
+
+        const card = container.querySelector(".rounded-xl.border");
+        expect(card).toHaveClass("border-gray-200");
+        expect(card).not.toHaveClass("border-red-300");
     });
 
     it("opens remove modal", () => {
