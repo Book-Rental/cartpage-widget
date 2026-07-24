@@ -56,9 +56,7 @@ export default function AddressSelectionStep() {
         script.async = true;
 
         script.onload = () => {
-            window.HOST_USER_INFO = {
-                _id: "6a478a2b85d2cac23d46a822",
-            };
+
 
             window.renderReactWidget?.(
                 JSON.stringify({
