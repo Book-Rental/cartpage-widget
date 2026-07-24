@@ -13,11 +13,18 @@ import OrderSummary from "../components/OrderSummary";
 import { useCart } from "../hooks/useCart";
 import { useClearCart } from "../hooks/useClearCart";
 import { showToast } from "../utils/ToastFunction";
-
+import { useValidateCart } from "../hooks/useValidateCart";
+import { InvalidCartItem } from "../types/cart";
 export default function CartPage() {
     const { data, isLoading, isError } = useCart();
     const { mutate: clearCart, isPending } = useClearCart();
     const [isClearModalOpen, setClearModalOpen] = useState(false);
+
+
+    const [invalidItems, setInvalidItems] = useState<InvalidCartItem[]>([]);
+    const [showValidationModal, setShowValidationModal] = useState(false);
+
+    const { mutate: validateCart } = useValidateCart();
 
     useEffect(() => {
         const event = new CustomEvent("widget-loading-status", {
@@ -47,6 +54,36 @@ export default function CartPage() {
             },
             onError: () => {
                 showToast("Failed to clear cart", "error");
+            },
+        });
+    };
+    const handleCheckout = () => {
+        validateCart(undefined, {
+            onSuccess: ({ isValid, invalidItems }) => {
+                if (isValid) {
+                    window.history.pushState({}, "", "/checkout");
+                    window.dispatchEvent(new PopStateEvent("popstate"));
+                } else {
+                    setInvalidItems(invalidItems);
+                    setShowValidationModal(true);
+                }
+            },
+            onError: () => {
+                showToast("Failed to validate cart", "error");
+            },
+        });
+    };
+    const clearItemError = (bookId: string) => {
+        setInvalidItems((prev) =>
+            prev.filter((item) => item.bookId !== bookId)
+        );
+
+        validateCart(undefined, {
+            onSuccess: ({ invalidItems }) => {
+                setInvalidItems(invalidItems);
+            },
+            onError: () => {
+                showToast("Failed to validate cart", "error");
             },
         });
     };
@@ -80,12 +117,21 @@ export default function CartPage() {
                             </div>
                         ) : (
                             <div className="space-y-6">
-                                {data.items.map((item) => (
-                                    <CartItem
-                                        key={item.bookId._id}
-                                        item={item}
-                                    />
-                                ))}
+                                {data.items.map((item) => {
+                                    const invalid = invalidItems.find(
+                                        (i) => i.bookId === item.bookId._id
+                                    );
+
+                                    return (
+                                        <CartItem
+                                            key={item.bookId._id}
+                                            item={item}
+                                            errorMessage={invalid?.reason}
+                                            onValidationSuccess={() => clearItemError(item.bookId._id)}
+
+                                        />
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
@@ -95,6 +141,7 @@ export default function CartPage() {
                     <OrderSummary
                         summary={data.summary}
                         itemCount={data.items.length}
+                        onCheckout={handleCheckout}
                     />
                 </div>
             </div>
@@ -125,6 +172,29 @@ export default function CartPage() {
                         onClick={handleClearCart}
                     >
                         Clear Cart
+                    </Rb_Button>
+                </ModalFooter>
+            </Modal>
+
+            <Modal
+                isOpen={showValidationModal}
+                onClose={() => setShowValidationModal(false)}
+            >
+                <ModalHeader
+                    onClose={() => setShowValidationModal(false)}
+                >
+                    Cart Validation Failed
+                </ModalHeader>
+
+                <ModalBody>
+                    Some items in your cart are unavailable.
+                </ModalBody>
+
+                <ModalFooter>
+                    <Rb_Button
+                        onClick={() => setShowValidationModal(false)}
+                    >
+                        OK
                     </Rb_Button>
                 </ModalFooter>
             </Modal>

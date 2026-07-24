@@ -5,7 +5,8 @@ import App from "./App";
 export interface WidgetOptions {
     containerElementId: string,
     name: string;
-    view?: "cart" | "checkout";
+    view: "cart" | "checkout" | "success";
+
 }
 
 declare global {

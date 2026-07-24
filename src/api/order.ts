@@ -1,7 +1,7 @@
 // api/order.ts
 
 import axios from "axios";
-import { CheckoutRequest } from "../hooks/CheckoutContext";
+import { CheckoutRequest } from "../types/checkout";
 
 export const placeOrder = async (payload: CheckoutRequest) => {
     const response = await axios.post(

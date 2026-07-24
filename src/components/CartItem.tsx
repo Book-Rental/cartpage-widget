@@ -21,9 +21,11 @@ import { useUpdateRentalPeriod } from "../hooks/useUpdateRentalPeriod";
 interface Props {
     item: CartItemType;
     errorMessage?: string;
+    onValidationSuccess?: () => void;
+
 }
 
-export default function CartItem({ item, errorMessage }: Props) {
+export default function CartItem({ item, errorMessage, onValidationSuccess }: Props) {
     const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
     const {
         mutate: updateQuantity,
@@ -139,7 +141,6 @@ export default function CartItem({ item, errorMessage }: Props) {
                                 disabled={isUpdatingQuantity}
                                 onChange={(value) => {
                                     setQuantity(value);
-
                                     updateQuantity(
                                         {
                                             bookId: item.bookId._id,
@@ -148,6 +149,9 @@ export default function CartItem({ item, errorMessage }: Props) {
                                             rentalPeriod: item.rentalPeriod,
                                         },
                                         {
+                                            onSuccess: () => {
+                                                onValidationSuccess?.();
+                                            },
                                             onError: () => {
                                                 setQuantity(item.quantity);
                                                 showToast("Failed to update quantity", "error");

@@ -5,42 +5,12 @@ import {
     useState,
 } from "react";
 
-import { Address } from "../types/cart";
+import { CheckoutRequest } from "../types/checkout";
 
-export type CheckoutStep =
-    | "validation"
+type CheckoutStep =
     | "address"
     | "review"
     | "payment";
-
-export interface CheckoutItem {
-    bookId: string;
-    quantity: number;
-    rentalType: string;
-}
-
-export interface PaymentDetails {
-    paymentMethod: string;
-    transactionId: string;
-}
-
-export interface AmountDetails {
-    rentalAmount: number;
-    securityDeposit: number;
-    deliveryFee: number;
-    discount: number;
-    tax: number;
-    totalAmount: number;
-}
-
-export interface CheckoutRequest {
-    userId: string;
-    items: CheckoutItem[];
-    shippingAddress: Address | null;
-    billingAddress: Address | null;
-    payment: PaymentDetails | null;
-    amount: AmountDetails | null;
-}
 
 interface CheckoutContextType {
     step: CheckoutStep;
@@ -63,23 +33,22 @@ const initialCheckoutData: CheckoutRequest = {
     amount: null,
 };
 
-const CheckoutContext = createContext<CheckoutContextType | undefined>(
-    undefined
-);
+export const CheckoutContext = createContext<
+    CheckoutContextType | undefined
+>(undefined);
 
 export function CheckoutProvider({
     children,
 }: {
     children: ReactNode;
 }) {
-    const [step, setStep] =
-        useState<CheckoutStep>("validation");
+    const [step, setStep] = useState<CheckoutStep>("address");
 
     const [checkoutData, setCheckoutData] =
         useState<CheckoutRequest>(initialCheckoutData);
 
     const resetCheckout = () => {
-        setStep("validation");
+        setStep("address");
         setCheckoutData(initialCheckoutData);
     };
 

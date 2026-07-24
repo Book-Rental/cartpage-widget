@@ -27,7 +27,7 @@ function TestComponent() {
             </div>
 
             <button
-                onClick={() => setStep("address")}
+                onClick={() => setStep("payment")}
             >
                 Change Step
             </button>
@@ -89,7 +89,7 @@ describe("CheckoutContext", () => {
 
         expect(
             screen.getByTestId("step")
-        ).toHaveTextContent("validation");
+        ).toHaveTextContent("address");
 
         expect(
             screen.getByTestId("userId")
@@ -109,7 +109,7 @@ describe("CheckoutContext", () => {
 
         expect(
             screen.getByTestId("step")
-        ).toHaveTextContent("address");
+        ).toHaveTextContent("payment");
     });
 
     it("updates checkout data", () => {
@@ -149,7 +149,7 @@ describe("CheckoutContext", () => {
 
         expect(
             screen.getByTestId("step")
-        ).toHaveTextContent("validation");
+        ).toHaveTextContent("address");
 
         expect(
             screen.getByTestId("userId")
