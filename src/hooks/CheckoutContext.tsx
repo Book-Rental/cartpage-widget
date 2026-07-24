@@ -6,25 +6,24 @@ import {
 } from "react";
 
 import { Address } from "../types/cart";
-
-export type CheckoutStep =
-    | "validation"
+type CheckoutStep =
     | "address"
     | "review"
     | "payment";
 
-export interface CheckoutItem {
+interface CheckoutItem {
     bookId: string;
     quantity: number;
     rentalType: string;
 }
 
-export interface PaymentDetails {
+interface PaymentDetails {
     paymentMethod: string;
     transactionId: string;
+    paymentStatus: string;
 }
 
-export interface AmountDetails {
+interface AmountDetails {
     rentalAmount: number;
     securityDeposit: number;
     deliveryFee: number;
@@ -33,7 +32,7 @@ export interface AmountDetails {
     totalAmount: number;
 }
 
-export interface CheckoutRequest {
+interface CheckoutRequest {
     userId: string;
     items: CheckoutItem[];
     shippingAddress: Address | null;
@@ -72,14 +71,13 @@ export function CheckoutProvider({
 }: {
     children: ReactNode;
 }) {
-    const [step, setStep] =
-        useState<CheckoutStep>("validation");
+    const [step, setStep] = useState<CheckoutStep>("address");
 
     const [checkoutData, setCheckoutData] =
         useState<CheckoutRequest>(initialCheckoutData);
 
     const resetCheckout = () => {
-        setStep("validation");
+        setStep("address");
         setCheckoutData(initialCheckoutData);
     };
 

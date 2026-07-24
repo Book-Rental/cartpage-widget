@@ -1,13 +1,16 @@
 import { useEffect } from "react";
 import { useCheckout } from "../hooks/CheckoutContext";
 import { usePlaceOrder } from "../hooks/usePlaceOrder";
+import { useClearCart } from "../hooks/useClearCart";
+import { Rb_LoadingSpinner } from "@rentbook/rentbook-ui-lib";
+
 
 const CheckoutPage: React.FC = () => {
     const paymentWidgetUrl = import.meta.env.VITE_PAYMENT_WIDGET_URL;
     const returnUrl = import.meta.env.VITE_RETURN_URL;
 
     const { checkoutData, setCheckoutData } = useCheckout();
-
+    const { mutate: clearCart, isPending } = useClearCart();
     const totalAmount = checkoutData.amount?.totalAmount ?? 0;
     const { mutate: placeOrder } = usePlaceOrder();
     // Load Payment Widget
@@ -51,28 +54,15 @@ const CheckoutPage: React.FC = () => {
 
     // Listen for Payment Success
     useEffect(() => {
-        const handlePaymentSuccess = (event: Event) => {
-            const customEvent = event as CustomEvent;
-
-            const {
-                status,
-                amount,
-                currency,
-                paymentMethod,
-                transactionId,
-            } = customEvent.detail;
-
-            console.log("Payment completed successfully!", {
-                status,
-                amount,
-                currency,
-                paymentMethod,
-                transactionId,
-            });
-            // eslint-disable-next-line  @typescript-eslint/no-explicit-any
+        const createOrder = (
+            paymentMethod: string,
+            transactionId: string,
+            paymentStatus: string
+        ) => {
             const payment = {
                 paymentMethod,
                 transactionId,
+                paymentStatus,
             };
 
             const payload = {
@@ -85,6 +75,9 @@ const CheckoutPage: React.FC = () => {
             placeOrder(payload, {
                 onSuccess: () => {
                     console.log("Order placed successfully");
+                    clearCart();
+                    window.history.pushState({}, "", "/OrderConform");
+                    window.dispatchEvent(new PopStateEvent("popstate"));
                 },
                 onError: () => {
                     console.log("Order placement failed");
@@ -92,9 +85,42 @@ const CheckoutPage: React.FC = () => {
             });
         };
 
+        const handlePaymentSuccess = (event: Event) => {
+            const customEvent = event as CustomEvent;
+
+            const {
+                paymentMethod,
+                transactionId,
+                paymentStatus,
+            } = customEvent.detail;
+
+            createOrder(
+                paymentMethod,
+                transactionId,
+                paymentStatus ?? "SUCCESS"
+            );
+        };
+
+        const handlePaymentFailure = (event: Event) => {
+            const customEvent = event as CustomEvent;
+
+            console.log("Payment failed", customEvent.detail);
+
+            createOrder(
+                "COD",
+                "",
+                "FAILED"
+            );
+        };
+
         window.addEventListener(
             "payment-widget-success",
             handlePaymentSuccess
+        );
+
+        window.addEventListener(
+            "payment-widget-failure",
+            handlePaymentFailure
         );
 
         return () => {
@@ -102,14 +128,15 @@ const CheckoutPage: React.FC = () => {
                 "payment-widget-success",
                 handlePaymentSuccess
             );
+
+            window.removeEventListener(
+                "payment-widget-failure",
+                handlePaymentFailure
+            );
         };
-    }, [setCheckoutData]);
+    }, [checkoutData, setCheckoutData, placeOrder, clearCart]);
 
-    // Debug - Remove this after testing
-    useEffect(() => {
-        console.log("Checkout Payload", checkoutData);
-    }, [checkoutData]);
-
+    if (isPending) return <><Rb_LoadingSpinner></Rb_LoadingSpinner></>
     return (
         <div
             id="test-widget-container"

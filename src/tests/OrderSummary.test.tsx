@@ -1,7 +1,30 @@
+import type { ReactNode, ButtonHTMLAttributes, HTMLAttributes } from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import OrderSummary from "../components/OrderSummary";
 import { CartSummary } from "../types/cart";
+
+interface MockTextProps extends HTMLAttributes<HTMLSpanElement> {
+    children: ReactNode;
+    variant?: string;
+}
+
+interface MockButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+    children: ReactNode;
+}
+
+// The real UI lib components pull in styling/behavior we don't need to
+// exercise here — just render enough markup for RTL queries to work.
+vi.mock("@rentbook/rentbook-ui-lib", () => ({
+    Rb_Text: ({ children, ...props }: MockTextProps) => (
+        <span {...props}>{children}</span>
+    ),
+    Rb_Button: ({ children, onClick, ...props }: MockButtonProps) => (
+        <button onClick={onClick} {...props}>
+            {children}
+        </button>
+    ),
+}));
 
 const mockSummary: CartSummary = {
     subtotal: 500,
@@ -12,26 +35,26 @@ const mockSummary: CartSummary = {
     items: [],
 };
 
-const renderComponent = (itemCount = 2) =>
+const onCheckoutMock = vi.fn();
+
+const renderComponent = (itemCount = 2, summary = mockSummary) =>
     render(
         <OrderSummary
-            summary={mockSummary}
+            summary={summary}
             itemCount={itemCount}
+            onCheckout={onCheckoutMock}
         />
     );
 
 describe("OrderSummary", () => {
     beforeEach(() => {
-        window.history.pushState({}, "", "/");
-        vi.restoreAllMocks();
+        onCheckoutMock.mockClear();
     });
 
     it("renders the order summary heading", () => {
         renderComponent();
 
-        expect(
-            screen.getByText("Order Summary")
-        ).toBeInTheDocument();
+        expect(screen.getByText("Order Summary")).toBeInTheDocument();
     });
 
     it("displays all summary values", () => {
@@ -41,21 +64,10 @@ describe("OrderSummary", () => {
             screen.getByText("Rental Charges (2 Books)")
         ).toBeInTheDocument();
 
-        expect(
-            screen.getByText("Security Deposit")
-        ).toBeInTheDocument();
-
-        expect(
-            screen.getByText("Delivery Charges")
-        ).toBeInTheDocument();
-
-        expect(
-            screen.getByText("Tax")
-        ).toBeInTheDocument();
-
-        expect(
-            screen.getByText("Total Amount")
-        ).toBeInTheDocument();
+        expect(screen.getByText("Security Deposit")).toBeInTheDocument();
+        expect(screen.getByText("Delivery Charges")).toBeInTheDocument();
+        expect(screen.getByText("Tax")).toBeInTheDocument();
+        expect(screen.getByText("Total Amount")).toBeInTheDocument();
 
         expect(screen.getByText("₹500")).toBeInTheDocument();
         expect(screen.getByText("₹1000")).toBeInTheDocument();
@@ -72,56 +84,52 @@ describe("OrderSummary", () => {
         ).toBeInTheDocument();
     });
 
-    it("shows zero delivery fee and total when cart is empty", () => {
-        renderComponent(0);
-
-        expect(
-            screen.getByText("Rental Charges (0 Books)")
-        ).toBeInTheDocument();
-
-        expect(screen.getAllByText("₹0")).toHaveLength(2);
-    });
-
-    it("renders checkout button", () => {
+    it("renders checkout button when the cart has items", () => {
         renderComponent();
 
         expect(
-            screen.getByRole("button", {
-                name: /proceed to checkout/i,
-            })
+            screen.getByRole("button", { name: /proceed to checkout/i })
         ).toBeInTheDocument();
     });
 
-    it("disables checkout button when cart is empty", () => {
-        renderComponent(0);
-
-        expect(
-            screen.getByRole("button", {
-                name: /proceed to checkout/i,
-            })
-        ).toBeDisabled();
-    });
-
-    it("navigates to checkout page", () => {
-        const pushStateSpy = vi.spyOn(window.history, "pushState");
-        const dispatchSpy = vi.spyOn(window, "dispatchEvent");
-
+    it("calls onCheckout when the checkout button is clicked", () => {
         renderComponent();
 
         fireEvent.click(
-            screen.getByRole("button", {
-                name: /proceed to checkout/i,
-            })
+            screen.getByRole("button", { name: /proceed to checkout/i })
         );
 
-        expect(pushStateSpy).toHaveBeenCalledWith(
-            {},
-            "",
-            "/checkout"
-        );
+        expect(onCheckoutMock).toHaveBeenCalledTimes(1);
+    });
 
-        expect(dispatchSpy).toHaveBeenCalledWith(
-            expect.any(PopStateEvent)
-        );
+    it("shows an empty-cart message and hides the summary when itemCount is 0", () => {
+        renderComponent(0);
+
+        expect(
+            screen.getByText(
+                "Add books to your cart to view the order summary."
+            )
+        ).toBeInTheDocument();
+
+        // Heading still renders, but nothing else from the summary body should.
+        expect(
+            screen.queryByText(/Rental Charges/)
+        ).not.toBeInTheDocument();
+        expect(screen.queryByText("Security Deposit")).not.toBeInTheDocument();
+        expect(screen.queryByText("Delivery Charges")).not.toBeInTheDocument();
+        expect(screen.queryByText("Tax")).not.toBeInTheDocument();
+        expect(screen.queryByText("Total Amount")).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole("button", { name: /proceed to checkout/i })
+        ).not.toBeInTheDocument();
+    });
+
+    it("does not call onCheckout when the cart is empty (no button to click)", () => {
+        renderComponent(0);
+
+        expect(
+            screen.queryByRole("button", { name: /proceed to checkout/i })
+        ).not.toBeInTheDocument();
+        expect(onCheckoutMock).not.toHaveBeenCalled();
     });
 });

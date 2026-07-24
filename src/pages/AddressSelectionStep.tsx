@@ -57,7 +57,7 @@ export default function AddressSelectionStep() {
 
         script.onload = () => {
             window.HOST_USER_INFO = {
-                _id: "6a3bbe38827e96ec21dcb390",
+                _id: "6a478a2b85d2cac23d46a822",
             };
 
             window.renderReactWidget?.(
@@ -91,7 +91,7 @@ export default function AddressSelectionStep() {
     }, [setCheckoutData]);
 
     return (
-        <div className="relative min-h-[400px] w-full">
+        <div className="relative w-full">
             {isLoading && (
                 <div className="absolute inset-0 flex items-center justify-center bg-gray-50/50">
                     <Rb_LoadingSpinner />
