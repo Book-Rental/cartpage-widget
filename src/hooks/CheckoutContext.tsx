@@ -5,41 +5,12 @@ import {
     useState,
 } from "react";
 
-import { Address } from "../types/cart";
+import { CheckoutRequest } from "../types/checkout";
+
 type CheckoutStep =
     | "address"
     | "review"
     | "payment";
-
-interface CheckoutItem {
-    bookId: string;
-    quantity: number;
-    rentalType: string;
-}
-
-interface PaymentDetails {
-    paymentMethod: string;
-    transactionId: string;
-    paymentStatus: string;
-}
-
-interface AmountDetails {
-    rentalAmount: number;
-    securityDeposit: number;
-    deliveryFee: number;
-    discount: number;
-    tax: number;
-    totalAmount: number;
-}
-
-interface CheckoutRequest {
-    userId: string;
-    items: CheckoutItem[];
-    shippingAddress: Address | null;
-    billingAddress: Address | null;
-    payment: PaymentDetails | null;
-    amount: AmountDetails | null;
-}
 
 interface CheckoutContextType {
     step: CheckoutStep;
@@ -62,9 +33,9 @@ const initialCheckoutData: CheckoutRequest = {
     amount: null,
 };
 
-const CheckoutContext = createContext<CheckoutContextType | undefined>(
-    undefined
-);
+export const CheckoutContext = createContext<
+    CheckoutContextType | undefined
+>(undefined);
 
 export function CheckoutProvider({
     children,
