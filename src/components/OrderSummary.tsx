@@ -6,13 +6,24 @@ interface Props {
     itemCount: number;
     onCheckout: () => void;
 }
+
 export default function OrderSummary({
     summary,
     itemCount,
     onCheckout,
 }: Props) {
     const hasItems = itemCount > 0;
+    const isLoggedIn = !!window.HOST_USER_INFO;
 
+    const handleProceedClick = () => {
+        if (isLoggedIn) {
+            onCheckout();
+            return;
+        }
+
+        window.history.pushState({}, "", "/auth");
+        window.dispatchEvent(new PopStateEvent("popstate"));
+    };
 
     return (
         <div className="rounded-xl border border-gray-200 bg-white p-5">
@@ -69,9 +80,12 @@ export default function OrderSummary({
 
                     <Rb_Button
                         className="mt-2 w-full"
-                        onClick={onCheckout}
+                        onClick={handleProceedClick}
+                        disabled={!hasItems}
                     >
-                        Proceed to Checkout
+                        {isLoggedIn
+                            ? "Proceed to Checkout"
+                            : "Login to Proceed"}
                     </Rb_Button>
                 </>
             )}
