@@ -8,9 +8,10 @@ interface Props {
 
 export default function OrderSummary({ summary, itemCount }: Props) {
     const hasItems = itemCount > 0;
+    const isLoggedIn = !!window.HOST_USER_INFO;
 
-    const handleProceedToCheckout = () => {
-        window.history.pushState({}, "", "/checkout");
+    const handleProceedClick = () => {
+        window.history.pushState({}, "", isLoggedIn ? "/checkout" : "/auth");
         window.dispatchEvent(new PopStateEvent("popstate"));
     };
 
@@ -57,10 +58,10 @@ export default function OrderSummary({ summary, itemCount }: Props) {
 
             <Rb_Button
                 className="mt-2 w-full"
-                onClick={handleProceedToCheckout}
+                onClick={handleProceedClick}
                 disabled={!hasItems}
             >
-                Proceed to Checkout
+                {isLoggedIn ? "Proceed to Checkout" : "Login to Proceed"}
             </Rb_Button>
         </div>
     );
