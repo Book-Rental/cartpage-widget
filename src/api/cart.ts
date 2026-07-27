@@ -2,6 +2,23 @@ import axios from "axios";
 import { endpoints } from "./api";
 import { CartData, CartResponse, RemoveCartItemPayload, UpdateCartQuantityPayload, UpdateRentalPeriodPayload, ValidateCartResponse } from "../types/cart";
 
+/**
+ * Retrieves or generates a persistent anonymous ID for guest users.
+ * The ID is stored in localStorage and survives page refreshes.
+ */
+const getAnonymousId = (): string => {
+    const STORAGE_KEY = "book_rental_anonymous_id";
+    let id = localStorage.getItem(STORAGE_KEY);
+    if (!id) {
+        id = crypto.randomUUID();
+        localStorage.setItem(STORAGE_KEY, id);
+    }
+    return id;
+};
+
+// Set the X-Anonymous-Id header on all outgoing requests
+axios.defaults.headers.common["X-Anonymous-Id"] = getAnonymousId();
+
 export const fetchCart = async (): Promise<CartData> => {
 
     const response = await axios.get<CartResponse>(endpoints.cart, {
