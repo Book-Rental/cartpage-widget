@@ -41,7 +41,7 @@ export default function ReviewStep() {
                         <Rb_Text className="text-sm text-gray-600">
                             {shippingAddress.city},{" "}
                             {shippingAddress.state} -{" "}
-                            {shippingAddress.pincode}
+                            {shippingAddress.zipCode}
                         </Rb_Text>
 
                         <Rb_Text className="text-sm text-gray-600">

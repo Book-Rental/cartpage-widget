@@ -89,7 +89,7 @@ export interface Address {
     landmark?: string;    // Optional field field guard
     city: string;
     state: string;
-    pincode: string;
+    zipCode: string;
     country: string;
 }
 

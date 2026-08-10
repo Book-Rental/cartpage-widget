@@ -3,13 +3,16 @@ import { Rb_LoadingSpinner } from "@rentbook/rentbook-ui-lib";
 
 import { Address } from "../types/cart";
 import { useCheckout } from "../hooks/CheckoutContext";
+import { useValidateAddress } from "../hooks/useValidateAddress";
 
 const PROFILE_WIDGET_URL = import.meta.env.VITE_PROFILE_WIDGET;
 const WIDGET_CONTAINER_ID = "profile-widget";
 
 export default function AddressSelectionStep() {
     const [isLoading, setIsLoading] = useState(true);
-
+    const {
+        mutate: validateAddress,
+    } = useValidateAddress();
     const { setCheckoutData } = useCheckout();
 
     useEffect(() => {
@@ -20,27 +23,36 @@ export default function AddressSelectionStep() {
 
         const handleWidgetLoading = (event: Event) => {
             const customEvent = event as CustomEvent<boolean>;
-
             if (customEvent.detail !== undefined) {
                 setIsLoading(customEvent.detail);
             }
         };
-
+        console.log("isLoading state:", isLoading);
         const handleAddressSelected = (event: Event) => {
             const customEvent = event as CustomEvent<Address>;
-
             const selectedAddress = customEvent.detail;
 
-            console.log("Selected Address:", selectedAddress);
+            if (!selectedAddress?.zipCode) {
+                console.error("Selected address does not contain zipCode");
+                return;
+            }
+            const pincode = selectedAddress.zipCode;
+            validateAddress(pincode, {
+                onSuccess: (response) => {
+                    console.log("Address validation response:", response);
 
-            // eslint-disable-next-line  @typescript-eslint/no-explicit-any
-            setCheckoutData((prev: any) => ({
-                ...prev,
-                shippingAddress: selectedAddress,
-                billingAddress: selectedAddress, // Same as shipping for now
-            }));
+                    setCheckoutData((prev) => ({
+                        ...prev,
+                        shippingAddress: selectedAddress,
+                        billingAddress: selectedAddress,
+                    }));
+                },
+
+                onError: (error) => {
+                    console.error("Address validation failed:", error);
+                },
+            });
         };
-
         window.addEventListener(
             "profile-address-selected",
             handleAddressSelected
@@ -89,7 +101,7 @@ export default function AddressSelectionStep() {
     }, [setCheckoutData]);
 
     return (
-        <div className="relative w-full">
+        <div className="relative w-full min-h-[300px]">
             {isLoading && (
                 <div className="absolute inset-0 flex items-center justify-center bg-gray-50/50">
                     <Rb_LoadingSpinner />

@@ -1,6 +1,13 @@
 import type { ReactNode } from "react";
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import {
+    render,
+    screen,
+    fireEvent,
+    waitFor,
+    act,
+} from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, Mock } from "vitest";
+
 import CartPage from "../pages/CartPage";
 import { useCart } from "../hooks/useCart";
 import { CartData, CartItemType, InvalidCartItem } from "../types/cart";
@@ -59,7 +66,9 @@ vi.mock("../components/CartItem", () => ({
         <div>
             <div>{item.bookId.name}</div>
             <div>{item.bookId.author}</div>
+
             {errorMessage && <div>{errorMessage}</div>}
+
             <button onClick={onValidationSuccess}>
                 Clear Error {item.bookId.name}
             </button>
@@ -70,30 +79,49 @@ vi.mock("../components/CartItem", () => ({
 vi.mock("../components/OrderSummary", () => ({
     default: ({ onCheckout }: { onCheckout: () => void }) => (
         <div>
-            Order Summary Component
+            <div>Order Summary Component</div>
+
             <button onClick={onCheckout}>Checkout</button>
         </div>
     ),
 }));
 
-
 vi.mock("@rentbook/rentbook-ui-lib", async (importOriginal) => {
-    const actual = await importOriginal<typeof import("@rentbook/rentbook-ui-lib")>();
+    const actual =
+        await importOriginal<typeof import("@rentbook/rentbook-ui-lib")>();
+
     return {
         ...actual,
-        Modal: ({ isOpen, onClose, children }: MockModalProps) =>
+
+        Modal: ({
+            isOpen,
+            onClose,
+            children,
+        }: MockModalProps) =>
             isOpen ? (
                 <div data-testid="modal">
-                    <button data-testid="modal-backdrop-close" onClick={onClose}>
+                    <button
+                        data-testid="modal-backdrop-close"
+                        onClick={onClose}
+                    >
                         Backdrop Close
                     </button>
+
                     {children}
                 </div>
             ) : null,
-        ModalHeader: ({ onClose, children }: MockModalHeaderProps) => (
+
+        ModalHeader: ({
+            onClose,
+            children,
+        }: MockModalHeaderProps) => (
             <div>
                 <span>{children}</span>
-                <button data-testid="modal-header-close" onClick={onClose}>
+
+                <button
+                    data-testid="modal-header-close"
+                    onClick={onClose}
+                >
                     ×
                 </button>
             </div>
@@ -108,6 +136,7 @@ const cartData: CartData = {
     userId: "user-1",
     createdAt: "",
     updatedAt: "",
+
     items: [
         {
             bookId: {
@@ -128,12 +157,14 @@ const cartData: CartData = {
             addedAt: "",
         },
     ],
+
     summary: {
         subtotal: 20,
         securityDepositTotal: 1000,
         deliveryFee: 50,
         tax: 10,
         total: 1080,
+
         items: [
             {
                 bookId: "1",
@@ -162,10 +193,12 @@ describe("CartPage", () => {
 
         render(<CartPage />);
 
-        expect(screen.getByText(/Loading cart details/i)).toBeInTheDocument();
+        expect(
+            screen.getByText(/Loading cart details/i)
+        ).toBeInTheDocument();
     });
 
-    it("shows error message", () => {
+    it("shows error message when cart fails to load", () => {
         mockUseCart.mockReturnValue({
             data: undefined,
             isLoading: false,
@@ -174,7 +207,23 @@ describe("CartPage", () => {
 
         render(<CartPage />);
 
-        expect(screen.getByText(/Failed to load cart/i)).toBeInTheDocument();
+        expect(
+            screen.getByText(/Failed to load cart/i)
+        ).toBeInTheDocument();
+    });
+
+    it("shows error message when cart data is unavailable", () => {
+        mockUseCart.mockReturnValue({
+            data: undefined,
+            isLoading: false,
+            isError: false,
+        });
+
+        render(<CartPage />);
+
+        expect(
+            screen.getByText(/Failed to load cart/i)
+        ).toBeInTheDocument();
     });
 
     it("renders cart data", () => {
@@ -186,14 +235,26 @@ describe("CartPage", () => {
 
         render(<CartPage />);
 
-        expect(screen.getByText("Atomic Habits")).toBeInTheDocument();
-        expect(screen.getByText("James Clear")).toBeInTheDocument();
+        expect(
+            screen.getByText("Atomic Habits")
+        ).toBeInTheDocument();
+
+        expect(
+            screen.getByText("James Clear")
+        ).toBeInTheDocument();
+
         expect(
             screen.getByText("Order Summary Component")
         ).toBeInTheDocument();
+
+        expect(
+            screen.getByRole("button", {
+                name: /Clear Cart/i,
+            })
+        ).toBeInTheDocument();
     });
 
-    it("dispatches a widget-loading-status event reflecting the loading state", () => {
+    it("dispatches loading status when cart is loading", () => {
         const dispatchSpy = vi.spyOn(window, "dispatchEvent");
 
         mockUseCart.mockReturnValue({
@@ -208,6 +269,25 @@ describe("CartPage", () => {
             expect.objectContaining({
                 type: "widget-loading-status",
                 detail: true,
+            })
+        );
+    });
+
+    it("dispatches loading status when cart finishes loading", () => {
+        const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+
+        mockUseCart.mockReturnValue({
+            data: cartData,
+            isLoading: false,
+            isError: false,
+        });
+
+        render(<CartPage />);
+
+        expect(dispatchSpy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                type: "widget-loading-status",
+                detail: false,
             })
         );
     });
@@ -227,19 +307,30 @@ describe("CartPage", () => {
 
         render(<CartPage />);
 
-        expect(screen.getByText(/Your cart is empty/i)).toBeInTheDocument();
+        expect(
+            screen.getByText(/Your cart is empty/i)
+        ).toBeInTheDocument();
 
-        fireEvent.click(
-            screen.getByRole("button", {
-                name: /Browse Books/i,
-            })
+        const browseButton = screen.getByRole("button", {
+            name: /Browse Books/i,
+        });
+
+        expect(browseButton).toBeInTheDocument();
+
+        fireEvent.click(browseButton);
+
+        expect(pushSpy).toHaveBeenCalledWith(
+            {},
+            "",
+            "/books"
         );
 
-        expect(pushSpy).toHaveBeenCalledWith({}, "", "/books");
-        expect(dispatchSpy).toHaveBeenCalled();
+        expect(dispatchSpy).toHaveBeenCalledWith(
+            expect.any(PopStateEvent)
+        );
     });
 
-    it("disables the Clear Cart button when the cart is empty", () => {
+    it("does not render Clear Cart button when cart is empty", () => {
         mockUseCart.mockReturnValue({
             data: {
                 ...cartData,
@@ -252,8 +343,10 @@ describe("CartPage", () => {
         render(<CartPage />);
 
         expect(
-            screen.getByRole("button", { name: /Clear Cart/i })
-        ).toBeDisabled();
+            screen.queryByRole("button", {
+                name: /Clear Cart/i,
+            })
+        ).not.toBeInTheDocument();
     });
 
     it("opens and closes clear cart modal", () => {
@@ -272,7 +365,9 @@ describe("CartPage", () => {
         );
 
         expect(
-            screen.getByText(/Are you sure you want to remove all books/i)
+            screen.getByText(
+                /Are you sure you want to remove all books/i
+            )
         ).toBeInTheDocument();
 
         fireEvent.click(
@@ -282,11 +377,13 @@ describe("CartPage", () => {
         );
 
         expect(
-            screen.queryByText(/Are you sure you want to remove all books/i)
+            screen.queryByText(
+                /Are you sure you want to remove all books/i
+            )
         ).not.toBeInTheDocument();
     });
 
-    it("closes the clear cart modal via the modal's onClose (backdrop)", () => {
+    it("closes clear cart modal using backdrop onClose", () => {
         mockUseCart.mockReturnValue({
             data: cartData,
             isLoading: false,
@@ -295,19 +392,30 @@ describe("CartPage", () => {
 
         render(<CartPage />);
 
-        fireEvent.click(screen.getByRole("button", { name: /Clear Cart/i }));
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: /Clear Cart/i,
+            })
+        );
+
         expect(
-            screen.getByText(/Are you sure you want to remove all books/i)
+            screen.getByText(
+                /Are you sure you want to remove all books/i
+            )
         ).toBeInTheDocument();
 
-        fireEvent.click(screen.getByTestId("modal-backdrop-close"));
+        fireEvent.click(
+            screen.getByTestId("modal-backdrop-close")
+        );
 
         expect(
-            screen.queryByText(/Are you sure you want to remove all books/i)
+            screen.queryByText(
+                /Are you sure you want to remove all books/i
+            )
         ).not.toBeInTheDocument();
     });
 
-    it("closes the clear cart modal via the modal header's onClose", () => {
+    it("closes clear cart modal using header onClose", () => {
         mockUseCart.mockReturnValue({
             data: cartData,
             isLoading: false,
@@ -316,15 +424,20 @@ describe("CartPage", () => {
 
         render(<CartPage />);
 
-        fireEvent.click(screen.getByRole("button", { name: /Clear Cart/i }));
-        expect(
-            screen.getByText(/Are you sure you want to remove all books/i)
-        ).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: /Clear Cart/i,
+            })
+        );
 
-        fireEvent.click(screen.getByTestId("modal-header-close"));
+        fireEvent.click(
+            screen.getByTestId("modal-header-close")
+        );
 
         expect(
-            screen.queryByText(/Are you sure you want to remove all books/i)
+            screen.queryByText(
+                /Are you sure you want to remove all books/i
+            )
         ).not.toBeInTheDocument();
     });
 
@@ -350,9 +463,16 @@ describe("CartPage", () => {
         );
 
         expect(clearCartMock).toHaveBeenCalledTimes(1);
+        expect(clearCartMock).toHaveBeenCalledWith(
+            undefined,
+            expect.objectContaining({
+                onSuccess: expect.any(Function),
+                onError: expect.any(Function),
+            })
+        );
     });
 
-    it("closes the modal and shows a success toast when clearing the cart succeeds", async () => {
+    it("closes modal and shows success toast when clearing cart succeeds", async () => {
         mockUseCart.mockReturnValue({
             data: cartData,
             isLoading: false,
@@ -361,23 +481,30 @@ describe("CartPage", () => {
 
         render(<CartPage />);
 
-        fireEvent.click(screen.getByRole("button", { name: /Clear Cart/i }));
-
-        expect(
-            screen.getByText(/Are you sure you want to remove all books/i)
-        ).toBeInTheDocument();
-
         fireEvent.click(
-            screen.getAllByRole("button", { name: /Clear Cart/i })[1]
+            screen.getByRole("button", {
+                name: /Clear Cart/i,
+            })
         );
 
-        const { onSuccess } = clearCartMock.mock.calls[0][1] as MutateOptions<void>;
+        fireEvent.click(
+            screen.getAllByRole("button", {
+                name: /Clear Cart/i,
+            })[1]
+        );
 
-        onSuccess(undefined as unknown as void);
+        const { onSuccess } =
+            clearCartMock.mock.calls[0][1] as MutateOptions<void>;
+
+        act(() => {
+            onSuccess(undefined);
+        });
 
         await waitFor(() => {
             expect(
-                screen.queryByText(/Are you sure you want to remove all books/i)
+                screen.queryByText(
+                    /Are you sure you want to remove all books/i
+                )
             ).not.toBeInTheDocument();
         });
 
@@ -386,7 +513,7 @@ describe("CartPage", () => {
         );
     });
 
-    it("shows an error toast when clearing the cart fails", () => {
+    it("shows error toast when clearing cart fails", () => {
         mockUseCart.mockReturnValue({
             data: cartData,
             isLoading: false,
@@ -395,15 +522,53 @@ describe("CartPage", () => {
 
         render(<CartPage />);
 
-        fireEvent.click(screen.getByRole("button", { name: /Clear Cart/i }));
         fireEvent.click(
-            screen.getAllByRole("button", { name: /Clear Cart/i })[1]
+            screen.getByRole("button", {
+                name: /Clear Cart/i,
+            })
         );
 
-        const { onError } = clearCartMock.mock.calls[0][1] as MutateOptions<void>;
+        fireEvent.click(
+            screen.getAllByRole("button", {
+                name: /Clear Cart/i,
+            })[1]
+        );
+
+        const { onError } =
+            clearCartMock.mock.calls[0][1] as MutateOptions<void>;
+
         onError();
 
-        expect(showToast).toHaveBeenCalledWith("Failed to clear cart", "error");
+        expect(showToast).toHaveBeenCalledWith(
+            "Failed to clear cart",
+            "error"
+        );
+    });
+
+    it("validates cart when Checkout is clicked", () => {
+        mockUseCart.mockReturnValue({
+            data: cartData,
+            isLoading: false,
+            isError: false,
+        });
+
+        render(<CartPage />);
+
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: /Checkout/i,
+            })
+        );
+
+        expect(validateCartMock).toHaveBeenCalledTimes(1);
+
+        expect(validateCartMock).toHaveBeenCalledWith(
+            undefined,
+            expect.objectContaining({
+                onSuccess: expect.any(Function),
+                onError: expect.any(Function),
+            })
+        );
     });
 
     it("navigates to checkout when cart validation succeeds", () => {
@@ -418,22 +583,37 @@ describe("CartPage", () => {
 
         render(<CartPage />);
 
-        fireEvent.click(screen.getByRole("button", { name: /Checkout/i }));
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: /Checkout/i,
+            })
+        );
 
-        const { onSuccess } = validateCartMock.mock.calls[0][1] as MutateOptions<{
-            isValid: boolean;
-            invalidItems: InvalidCartItem[];
-        }>;
+        const { onSuccess } =
+            validateCartMock.mock.calls[0][1] as MutateOptions<{
+                isValid: boolean;
+                invalidItems: InvalidCartItem[];
+            }>;
 
         act(() => {
-            onSuccess({ isValid: true, invalidItems: [] });
+            onSuccess({
+                isValid: true,
+                invalidItems: [],
+            });
         });
 
-        expect(pushSpy).toHaveBeenCalledWith({}, "", "/checkout");
-        expect(dispatchSpy).toHaveBeenCalledWith(expect.any(PopStateEvent));
+        expect(pushSpy).toHaveBeenCalledWith(
+            {},
+            "",
+            "/checkout"
+        );
+
+        expect(dispatchSpy).toHaveBeenCalledWith(
+            expect.any(PopStateEvent)
+        );
     });
 
-    it("shows the validation modal and per-item errors when cart validation fails", () => {
+    it("shows validation modal when cart validation fails", () => {
         mockUseCart.mockReturnValue({
             data: cartData,
             isLoading: false,
@@ -444,28 +624,48 @@ describe("CartPage", () => {
 
         render(<CartPage />);
 
-        fireEvent.click(screen.getByRole("button", { name: /Checkout/i }));
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: /Checkout/i,
+            })
+        );
 
-        const { onSuccess } = validateCartMock.mock.calls[0][1] as MutateOptions<{
-            isValid: boolean;
-            invalidItems: InvalidCartItem[];
-        }>;
+        const { onSuccess } =
+            validateCartMock.mock.calls[0][1] as MutateOptions<{
+                isValid: boolean;
+                invalidItems: InvalidCartItem[];
+            }>;
 
         act(() => {
             onSuccess({
                 isValid: false,
-                invalidItems: [{ bookId: "1", reason: "Out of stock" }],
+                invalidItems: [
+                    {
+                        bookId: "1",
+                        reason: "Out of stock",
+                    },
+                ],
             });
         });
 
         expect(
-            screen.getByText(/Some items in your cart are unavailable/i)
+            screen.getByText(
+                /Some items in your cart are unavailable/i
+            )
         ).toBeInTheDocument();
-        expect(screen.getByText("Out of stock")).toBeInTheDocument();
-        expect(pushSpy).not.toHaveBeenCalledWith({}, "", "/checkout");
+
+        expect(
+            screen.getByText("Out of stock")
+        ).toBeInTheDocument();
+
+        expect(pushSpy).not.toHaveBeenCalledWith(
+            {},
+            "",
+            "/checkout"
+        );
     });
 
-    it("closes the validation modal via the OK button", () => {
+    it("passes validation error to the correct cart item", () => {
         mockUseCart.mockReturnValue({
             data: cartData,
             isLoading: false,
@@ -474,32 +674,88 @@ describe("CartPage", () => {
 
         render(<CartPage />);
 
-        fireEvent.click(screen.getByRole("button", { name: /Checkout/i }));
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: /Checkout/i,
+            })
+        );
 
-        const { onSuccess } = validateCartMock.mock.calls[0][1] as MutateOptions<{
-            isValid: boolean;
-            invalidItems: InvalidCartItem[];
-        }>;
+        const { onSuccess } =
+            validateCartMock.mock.calls[0][1] as MutateOptions<{
+                isValid: boolean;
+                invalidItems: InvalidCartItem[];
+            }>;
 
         act(() => {
             onSuccess({
                 isValid: false,
-                invalidItems: [{ bookId: "1", reason: "Out of stock" }],
+                invalidItems: [
+                    {
+                        bookId: "1",
+                        reason: "Insufficient inventory",
+                    },
+                ],
             });
         });
 
         expect(
-            screen.getByText(/Some items in your cart are unavailable/i)
+            screen.getByText("Insufficient inventory")
         ).toBeInTheDocument();
+    });
 
-        fireEvent.click(screen.getByRole("button", { name: /^OK$/i }));
+    it("closes validation modal using OK button", () => {
+        mockUseCart.mockReturnValue({
+            data: cartData,
+            isLoading: false,
+            isError: false,
+        });
+
+        render(<CartPage />);
+
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: /Checkout/i,
+            })
+        );
+
+        const { onSuccess } =
+            validateCartMock.mock.calls[0][1] as MutateOptions<{
+                isValid: boolean;
+                invalidItems: InvalidCartItem[];
+            }>;
+
+        act(() => {
+            onSuccess({
+                isValid: false,
+                invalidItems: [
+                    {
+                        bookId: "1",
+                        reason: "Out of stock",
+                    },
+                ],
+            });
+        });
 
         expect(
-            screen.queryByText(/Some items in your cart are unavailable/i)
+            screen.getByText(
+                /Some items in your cart are unavailable/i
+            )
+        ).toBeInTheDocument();
+
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: /^OK$/i,
+            })
+        );
+
+        expect(
+            screen.queryByText(
+                /Some items in your cart are unavailable/i
+            )
         ).not.toBeInTheDocument();
     });
 
-    it("closes the validation modal via the modal's onClose (backdrop)", () => {
+    it("closes validation modal using backdrop onClose", () => {
         mockUseCart.mockReturnValue({
             data: cartData,
             isLoading: false,
@@ -508,32 +764,42 @@ describe("CartPage", () => {
 
         render(<CartPage />);
 
-        fireEvent.click(screen.getByRole("button", { name: /Checkout/i }));
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: /Checkout/i,
+            })
+        );
 
-        const { onSuccess } = validateCartMock.mock.calls[0][1] as MutateOptions<{
-            isValid: boolean;
-            invalidItems: InvalidCartItem[];
-        }>;
+        const { onSuccess } =
+            validateCartMock.mock.calls[0][1] as MutateOptions<{
+                isValid: boolean;
+                invalidItems: InvalidCartItem[];
+            }>;
 
         act(() => {
             onSuccess({
                 isValid: false,
-                invalidItems: [{ bookId: "1", reason: "Out of stock" }],
+                invalidItems: [
+                    {
+                        bookId: "1",
+                        reason: "Out of stock",
+                    },
+                ],
             });
         });
 
-        expect(
-            screen.getByText(/Some items in your cart are unavailable/i)
-        ).toBeInTheDocument();
-
-        fireEvent.click(screen.getByTestId("modal-backdrop-close"));
+        fireEvent.click(
+            screen.getByTestId("modal-backdrop-close")
+        );
 
         expect(
-            screen.queryByText(/Some items in your cart are unavailable/i)
+            screen.queryByText(
+                /Some items in your cart are unavailable/i
+            )
         ).not.toBeInTheDocument();
     });
 
-    it("closes the validation modal via the modal header's onClose", () => {
+    it("closes validation modal using header onClose", () => {
         mockUseCart.mockReturnValue({
             data: cartData,
             isLoading: false,
@@ -542,32 +808,42 @@ describe("CartPage", () => {
 
         render(<CartPage />);
 
-        fireEvent.click(screen.getByRole("button", { name: /Checkout/i }));
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: /Checkout/i,
+            })
+        );
 
-        const { onSuccess } = validateCartMock.mock.calls[0][1] as MutateOptions<{
-            isValid: boolean;
-            invalidItems: InvalidCartItem[];
-        }>;
+        const { onSuccess } =
+            validateCartMock.mock.calls[0][1] as MutateOptions<{
+                isValid: boolean;
+                invalidItems: InvalidCartItem[];
+            }>;
 
         act(() => {
             onSuccess({
                 isValid: false,
-                invalidItems: [{ bookId: "1", reason: "Out of stock" }],
+                invalidItems: [
+                    {
+                        bookId: "1",
+                        reason: "Out of stock",
+                    },
+                ],
             });
         });
 
-        expect(
-            screen.getByText(/Some items in your cart are unavailable/i)
-        ).toBeInTheDocument();
-
-        fireEvent.click(screen.getByTestId("modal-header-close"));
+        fireEvent.click(
+            screen.getByTestId("modal-header-close")
+        );
 
         expect(
-            screen.queryByText(/Some items in your cart are unavailable/i)
+            screen.queryByText(
+                /Some items in your cart are unavailable/i
+            )
         ).not.toBeInTheDocument();
     });
 
-    it("shows an error toast when cart validation fails to run", () => {
+    it("shows error toast when cart validation fails", () => {
         mockUseCart.mockReturnValue({
             data: cartData,
             isLoading: false,
@@ -576,12 +852,17 @@ describe("CartPage", () => {
 
         render(<CartPage />);
 
-        fireEvent.click(screen.getByRole("button", { name: /Checkout/i }));
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: /Checkout/i,
+            })
+        );
 
-        const { onError } = validateCartMock.mock.calls[0][1] as MutateOptions<{
-            isValid: boolean;
-            invalidItems: InvalidCartItem[];
-        }>;
+        const { onError } =
+            validateCartMock.mock.calls[0][1] as MutateOptions<{
+                isValid: boolean;
+                invalidItems: InvalidCartItem[];
+            }>;
 
         onError();
 
@@ -600,11 +881,15 @@ describe("CartPage", () => {
 
         render(<CartPage />);
 
-        // Trigger the initial invalid state via a checkout attempt.
-        fireEvent.click(screen.getByRole("button", { name: /Checkout/i }));
+        // Initial validation.
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: /Checkout/i,
+            })
+        );
 
-        const { onSuccess: initialOnSuccess } = validateCartMock.mock
-            .calls[0][1] as MutateOptions<{
+        const { onSuccess: initialOnSuccess } =
+            validateCartMock.mock.calls[0][1] as MutateOptions<{
                 isValid: boolean;
                 invalidItems: InvalidCartItem[];
             }>;
@@ -612,32 +897,47 @@ describe("CartPage", () => {
         act(() => {
             initialOnSuccess({
                 isValid: false,
-                invalidItems: [{ bookId: "1", reason: "Out of stock" }],
+                invalidItems: [
+                    {
+                        bookId: "1",
+                        reason: "Out of stock",
+                    },
+                ],
             });
         });
 
-        expect(screen.getByText("Out of stock")).toBeInTheDocument();
+        expect(
+            screen.getByText("Out of stock")
+        ).toBeInTheDocument();
 
+        // Clear the item's error.
         fireEvent.click(
-            screen.getByRole("button", { name: /Clear Error Atomic Habits/i })
+            screen.getByRole("button", {
+                name: /Clear Error Atomic Habits/i,
+            })
         );
 
         expect(validateCartMock).toHaveBeenCalledTimes(2);
 
-        const { onSuccess: revalidateOnSuccess } = validateCartMock.mock
-            .calls[1][1] as MutateOptions<{
+        const { onSuccess: revalidateOnSuccess } =
+            validateCartMock.mock.calls[1][1] as MutateOptions<{
                 isValid: boolean;
                 invalidItems: InvalidCartItem[];
             }>;
 
         act(() => {
-            revalidateOnSuccess({ isValid: true, invalidItems: [] });
+            revalidateOnSuccess({
+                isValid: true,
+                invalidItems: [],
+            });
         });
 
-        expect(screen.queryByText("Out of stock")).not.toBeInTheDocument();
+        expect(
+            screen.queryByText("Out of stock")
+        ).not.toBeInTheDocument();
     });
 
-    it("shows an error toast when revalidating after clearing an item error fails", () => {
+    it("keeps validation error when revalidation still returns invalid items", () => {
         mockUseCart.mockReturnValue({
             data: cartData,
             isLoading: false,
@@ -647,13 +947,80 @@ describe("CartPage", () => {
         render(<CartPage />);
 
         fireEvent.click(
-            screen.getByRole("button", { name: /Clear Error Atomic Habits/i })
+            screen.getByRole("button", {
+                name: /Checkout/i,
+            })
         );
 
-        const { onError } = validateCartMock.mock.calls[0][1] as MutateOptions<{
-            isValid: boolean;
-            invalidItems: InvalidCartItem[];
-        }>;
+        const { onSuccess: initialOnSuccess } =
+            validateCartMock.mock.calls[0][1] as MutateOptions<{
+                isValid: boolean;
+                invalidItems: InvalidCartItem[];
+            }>;
+
+        act(() => {
+            initialOnSuccess({
+                isValid: false,
+                invalidItems: [
+                    {
+                        bookId: "1",
+                        reason: "Out of stock",
+                    },
+                ],
+            });
+        });
+
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: /Clear Error Atomic Habits/i,
+            })
+        );
+
+        const { onSuccess: revalidateOnSuccess } =
+            validateCartMock.mock.calls[1][1] as MutateOptions<{
+                isValid: boolean;
+                invalidItems: InvalidCartItem[];
+            }>;
+
+        act(() => {
+            revalidateOnSuccess({
+                isValid: false,
+                invalidItems: [
+                    {
+                        bookId: "1",
+                        reason: "Still unavailable",
+                    },
+                ],
+            });
+        });
+
+        expect(
+            screen.getByText("Still unavailable")
+        ).toBeInTheDocument();
+    });
+
+    it("shows error toast when revalidation fails after clearing item error", () => {
+        mockUseCart.mockReturnValue({
+            data: cartData,
+            isLoading: false,
+            isError: false,
+        });
+
+        render(<CartPage />);
+
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: /Clear Error Atomic Habits/i,
+            })
+        );
+
+        expect(validateCartMock).toHaveBeenCalledTimes(1);
+
+        const { onError } =
+            validateCartMock.mock.calls[0][1] as MutateOptions<{
+                isValid: boolean;
+                invalidItems: InvalidCartItem[];
+            }>;
 
         onError();
 

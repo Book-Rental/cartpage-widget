@@ -98,14 +98,18 @@ export default function CartPage() {
                                 Your Cart ({data.items.length}{" "}
                                 {data.items.length === 1 ? "Item" : "Items"})
                             </h1>
+                            {
+                                data.items.length === 0 ? null : (
+                                    <Rb_Button
+                                        variant="outline"
+                                        onClick={() => setClearModalOpen(true)}
+                                        disabled={isPending}
+                                    >
+                                        Clear Cart
+                                    </Rb_Button>
+                                )
+                            }
 
-                            <Rb_Button
-                                variant="outline"
-                                onClick={() => setClearModalOpen(true)}
-                                disabled={isPending || data.items.length === 0}
-                            >
-                                Clear Cart
-                            </Rb_Button>
                         </div>
 
                         {data.items.length === 0 ? (
