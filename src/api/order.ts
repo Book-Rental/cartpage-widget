@@ -2,10 +2,11 @@
 
 import axios from "axios";
 import { CheckoutRequest } from "../types/checkout";
+import { endpoints } from "./api";
 
 export const placeOrder = async (payload: CheckoutRequest) => {
     const response = await axios.post(
-        `https://be-book-rental.onrender.com/api/order/craete`,
+        endpoints.placeOrder,
         payload,
         {
             withCredentials: true,
