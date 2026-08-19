@@ -1,18 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Rb_LoadingSpinner } from "@rentbook/rentbook-ui-lib";
 
 import { Address } from "../types/cart";
 import { useCheckout } from "../hooks/CheckoutContext";
 import { useValidateAddress } from "../hooks/useValidateAddress";
+import { showToast } from "../utils/ToastFunction";
 
 const PROFILE_WIDGET_URL = import.meta.env.VITE_PROFILE_WIDGET;
 const WIDGET_CONTAINER_ID = "profile-widget";
 
 export default function AddressSelectionStep() {
     const [isLoading, setIsLoading] = useState(true);
-    const {
-        mutate: validateAddress,
-    } = useValidateAddress();
+
+    const isValidatingAddress = useRef(false);
+    const lastValidatedPincode = useRef<string | null>(null);
+
+    const { mutate: validateAddress } = useValidateAddress();
     const { setCheckoutData } = useCheckout();
 
     useEffect(() => {
@@ -27,32 +30,75 @@ export default function AddressSelectionStep() {
                 setIsLoading(customEvent.detail);
             }
         };
-        console.log("isLoading state:", isLoading);
+
         const handleAddressSelected = (event: Event) => {
             const customEvent = event as CustomEvent<Address>;
             const selectedAddress = customEvent.detail;
 
             if (!selectedAddress?.zipCode) {
-                console.error("Selected address does not contain zipCode");
+                showToast(
+                    "Selected address does not contain a valid ZIP code.",
+                    "error"
+                );
                 return;
             }
+
             const pincode = selectedAddress.zipCode;
+            if (
+                isValidatingAddress.current ||
+                pincode === lastValidatedPincode.current
+            ) {
+                console.log(
+                    "Ignoring duplicate profile-address-selected event for",
+                    pincode
+                );
+                return;
+            }
+
+            isValidatingAddress.current = true;
+            lastValidatedPincode.current = pincode;
+
             validateAddress(pincode, {
                 onSuccess: (response) => {
-                    console.log("Address validation response:", response);
+                    if (response?.data?.isValid === true) {
+                        setCheckoutData((prev) => ({
+                            ...prev,
+                            shippingAddress: selectedAddress,
+                            billingAddress: selectedAddress,
+                        }));
 
-                    setCheckoutData((prev) => ({
-                        ...prev,
-                        shippingAddress: selectedAddress,
-                        billingAddress: selectedAddress,
-                    }));
+                        showToast(
+                            "Address validated successfully.",
+                            "success"
+                        );
+                    } else {
+                        showToast(
+                            response?.data?.message ||
+                            "The selected address is not serviceable.",
+                            "error"
+                        );
+                    }
+
+                    isValidatingAddress.current = false;
                 },
 
                 onError: (error) => {
-                    console.error("Address validation failed:", error);
+                    console.error(
+                        "Address validation failed:",
+                        error
+                    );
+
+                    showToast(
+                        "Unable to validate the address. Please try again.",
+                        "error"
+                    );
+
+                    isValidatingAddress.current = false;
+                    lastValidatedPincode.current = null;
                 },
             });
         };
+
         window.addEventListener(
             "profile-address-selected",
             handleAddressSelected
@@ -62,13 +108,28 @@ export default function AddressSelectionStep() {
             "widget-loading-status",
             handleWidgetLoading
         );
+        const existingScript = document.querySelector(
+            `script[src="${PROFILE_WIDGET_URL}"]`
+        );
 
-        const script = document.createElement("script");
-        script.src = PROFILE_WIDGET_URL;
-        script.async = true;
+        const script = existingScript ?? document.createElement("script");
 
-        script.onload = () => {
+        if (!existingScript) {
+            script.setAttribute("src", PROFILE_WIDGET_URL);
+            script.setAttribute("async", "true");
 
+            script.addEventListener("load", () => {
+                window.renderReactWidget?.(
+                    JSON.stringify({
+                        containerElementId: WIDGET_CONTAINER_ID,
+                        name: "profile_Widget",
+                        view: "address",
+                    })
+                );
+            });
+
+            document.body.appendChild(script);
+        } else {
 
             window.renderReactWidget?.(
                 JSON.stringify({
@@ -77,14 +138,12 @@ export default function AddressSelectionStep() {
                     view: "address",
                 })
             );
-        };
-
-        document.body.appendChild(script);
+        }
 
         return () => {
             window.unmountReactWidget?.(WIDGET_CONTAINER_ID);
 
-            if (document.body.contains(script)) {
+            if (!existingScript && document.body.contains(script)) {
                 document.body.removeChild(script);
             }
 
@@ -98,7 +157,8 @@ export default function AddressSelectionStep() {
                 handleAddressSelected
             );
         };
-    }, [setCheckoutData]);
+
+    }, []);
 
     return (
         <div className="relative w-full min-h-[300px]">
