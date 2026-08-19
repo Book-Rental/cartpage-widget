@@ -12,7 +12,7 @@ dist
 dist-ssr
 *.local
 # Coverage reports
-coverage/
+coverage
 # Editor directories and files
 vite.config.ts.timestamp-*
 .vscode/*
