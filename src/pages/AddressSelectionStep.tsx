@@ -9,7 +9,14 @@ import { showToast } from "../utils/ToastFunction";
 const PROFILE_WIDGET_URL = import.meta.env.VITE_PROFILE_WIDGET;
 const WIDGET_CONTAINER_ID = "profile-widget";
 
-export default function AddressSelectionStep() {
+interface AddressSelectionStepProps {
+    onAddressValidationChange: (isValid: boolean) => void;
+}
+
+
+export default function AddressSelectionStep({
+    onAddressValidationChange,
+}: AddressSelectionStepProps) {
     const [isLoading, setIsLoading] = useState(true);
 
     const isValidatingAddress = useRef(false);
@@ -34,12 +41,14 @@ export default function AddressSelectionStep() {
         const handleAddressSelected = (event: Event) => {
             const customEvent = event as CustomEvent<Address>;
             const selectedAddress = customEvent.detail;
-
             if (!selectedAddress?.zipCode) {
+                onAddressValidationChange(false);
+
                 showToast(
                     "Selected address does not contain a valid ZIP code.",
                     "error"
                 );
+
                 return;
             }
 
@@ -67,11 +76,15 @@ export default function AddressSelectionStep() {
                             billingAddress: selectedAddress,
                         }));
 
+                        onAddressValidationChange(true);
+
                         showToast(
                             "Address validated successfully.",
                             "success"
                         );
                     } else {
+                        onAddressValidationChange(false);
+
                         showToast(
                             response?.data?.message ||
                             "The selected address is not serviceable.",
@@ -83,10 +96,9 @@ export default function AddressSelectionStep() {
                 },
 
                 onError: (error) => {
-                    console.error(
-                        "Address validation failed:",
-                        error
-                    );
+                    console.error("Address validation failed:", error);
+
+                    onAddressValidationChange(false);
 
                     showToast(
                         "Unable to validate the address. Please try again.",

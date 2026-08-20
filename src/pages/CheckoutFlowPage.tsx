@@ -42,7 +42,7 @@ export default function CheckoutFlowPage() {
         checkoutData,
         setCheckoutData,
     } = useCheckout();
-
+    const [isAddressValid, setIsAddressValid] = useState(false);
 
     const [invalidItems, setInvalidItems] = useState<InvalidCartItem[]>([]);
 
@@ -137,8 +137,9 @@ export default function CheckoutFlowPage() {
 
                     {step === "address" && (
                         <>
-                            <AddressSelectionStep />
-
+                            <AddressSelectionStep
+                                onAddressValidationChange={setIsAddressValid}
+                            />
                             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                                 <Rb_Button
                                     variant="secondary"
@@ -150,7 +151,7 @@ export default function CheckoutFlowPage() {
 
                                 <Rb_Button
                                     className="w-full sm:w-auto"
-                                    disabled={!checkoutData.shippingAddress}
+                                    disabled={!checkoutData.shippingAddress || !isAddressValid}
                                     onClick={() => setStep("review")}
                                 >
                                     Continue to Review
