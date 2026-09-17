@@ -1,3 +1,4 @@
+
 import { useCallback, useEffect, useState } from "react";
 import {
     Modal,
@@ -42,19 +43,32 @@ export default function CheckoutFlowPage() {
         checkoutData,
         setCheckoutData,
     } = useCheckout();
-    const [isAddressValid, setIsAddressValid] = useState(false);
 
+    const [isAddressValid, setIsAddressValid] = useState(false);
     const [invalidItems, setInvalidItems] = useState<InvalidCartItem[]>([]);
 
+    const [isAuctionLoading, setIsAuctionLoading] = useState(false);
+
     const { mutate: validateCart } = useValidateCart();
+
     const [isValidationModalOpen, setValidationModalOpen] =
         useState(false);
+
+    const historyState = window.history.state;
+
+    const isAuctionCheckout =
+        historyState?.orderType === "auction";
+
+    const auctionId = historyState?.auctionId;
+    const auctionBookId = historyState?.bookId;
+
     useEffect(() => {
-        if (!data) return;
-        // eslint-disable-next-line  @typescript-eslint/no-explicit-any
-        setCheckoutData((prev: any) => ({
+        if (!data || isAuctionCheckout) return;
+
+        setCheckoutData((prev) => ({
             ...prev,
             userId: data.userId,
+            orderType: "rent",
             items: data.items.map((item) => ({
                 bookId: item.bookId._id,
                 quantity: item.quantity,
@@ -69,7 +83,130 @@ export default function CheckoutFlowPage() {
                 totalAmount: data.summary.total,
             },
         }));
-    }, [data, setCheckoutData]);
+    }, [
+        data,
+        isAuctionCheckout,
+        setCheckoutData,
+    ]);
+
+    useEffect(() => {
+        if (!isAuctionCheckout || !auctionId) {
+            return;
+        }
+
+        const loadAuctionCheckout = async () => {
+            try {
+                setIsAuctionLoading(true);
+
+                const API_URL = import.meta.env.VITE_API_BASE_URL;
+
+                const response = await fetch(
+                    `${API_URL}/auction/${auctionId}/bids`,
+                    {
+                        method: "GET",
+                        credentials: "include",
+                    }
+                );
+
+                if (!response.ok) {
+                    throw new Error(
+                        "Failed to fetch auction details"
+                    );
+                }
+
+                const result = await response.json();
+
+                console.log(
+                    "Auction checkout response:",
+                    result
+                );
+
+                // API response:
+                // result.data.auction.currentBidPrice
+                const auction =
+                    result?.data?.auction ??
+                    result?.auction ??
+                    result;
+
+                const currentBidPrice = Number(
+                    auction?.currentBidPrice ?? 0
+                );
+
+                // Auction amount details
+                const deliveryFee = 49;
+                const discount = 0;
+                const rentalAmount = 0;
+                const securityDeposit = 0;
+                const tax = 0;
+
+                // Auction total = bid price + delivery fee - discount
+                const totalAmount =
+                    currentBidPrice +
+                    deliveryFee -
+                    discount;
+
+                const userId =
+                    historyState?.userId ||
+                    window.HOST_USER_INFO?._id ||
+                    "";
+
+                const auctionCheckoutData = {
+                    userId,
+
+                    orderType: "auction" as const,
+
+                    items: [
+                        {
+                            bookId: auctionBookId,
+                            quantity: 1,
+                        },
+                    ],
+
+                    amount: {
+                        itemAmount: currentBidPrice,
+                        rentalAmount,
+                        securityDeposit,
+                        deliveryFee,
+                        discount,
+                        tax,
+                        totalAmount,
+                    },
+                };
+
+                setCheckoutData((prev) => ({
+                    ...prev,
+                    ...auctionCheckoutData,
+                }));
+
+                console.log(
+                    "Auction checkout amount:",
+                    auctionCheckoutData.amount
+                );
+            } catch (error) {
+                console.error(
+                    "Auction checkout error:",
+                    error
+                );
+
+                showToast(
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to load auction details.",
+                    "error"
+                );
+            } finally {
+                setIsAuctionLoading(false);
+            }
+        };
+
+        loadAuctionCheckout();
+    }, [
+        isAuctionCheckout,
+        auctionId,
+        auctionBookId,
+        setCheckoutData,
+    ]);
+
     const runValidation = useCallback(() => {
         validateCart(undefined, {
             onSuccess: ({ isValid, invalidItems }) => {
@@ -82,21 +219,38 @@ export default function CheckoutFlowPage() {
                 }
             },
             onError: () => {
-                showToast("Failed to validate cart", "error");
+                showToast(
+                    "Failed to validate cart",
+                    "error"
+                );
             },
         });
-    }, [validateCart, setStep]);;
+    }, [validateCart, setStep]);
 
     useEffect(() => {
+        if (isAuctionCheckout) {
+            setStep("address");
+            return;
+        }
+
         runValidation();
+
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [isAuctionCheckout]);
 
     const handleBackToCart = () => {
-        navigateTo("/cart");
-    };
+    if (isAuctionCheckout) {
+        navigateTo("/my-bids?tab=won");
+        return;
+    }
 
-    if (isCartLoading) {
+    navigateTo("/cart");
+};
+
+    if (
+        isCartLoading &&
+        !isAuctionCheckout
+    ) {
         return (
             <div className="flex min-h-[60vh] items-center justify-center">
                 <Rb_LoadingSpinner text="Loading checkout..." />
@@ -104,18 +258,33 @@ export default function CheckoutFlowPage() {
         );
     }
 
-    const invalidItemDetails = invalidItems.map((invalid) => {
-        const cartItem = data?.items.find(
-            (item) => item.bookId._id === invalid.bookId
+    if (
+        isAuctionCheckout &&
+        (isAuctionLoading || !checkoutData.amount)
+    ) {
+        return (
+            <div className="flex min-h-[60vh] items-center justify-center">
+                <Rb_LoadingSpinner text="Loading auction checkout..." />
+            </div>
         );
+    }
 
-        return {
-            bookId: invalid.bookId,
-            reason: invalid.reason,
-            name: cartItem?.bookId.name ?? "Unknown item",
-        };
-    });
+    const invalidItemDetails = invalidItems.map(
+        (invalid) => {
+            const cartItem = data?.items.find(
+                (item) =>
+                    item.bookId._id === invalid.bookId
+            );
 
+            return {
+                bookId: invalid.bookId,
+                reason: invalid.reason,
+                name:
+                    cartItem?.bookId.name ??
+                    "Unknown item",
+            };
+        }
+    );
 
     return (
         <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
@@ -134,103 +303,143 @@ export default function CheckoutFlowPage() {
 
                 <div className="mt-6 sm:mt-8">
 
-
+                    {/* ADDRESS */}
                     {step === "address" && (
                         <>
                             <AddressSelectionStep
-                                onAddressValidationChange={setIsAddressValid}
+                                onAddressValidationChange={
+                                    setIsAddressValid
+                                }
                             />
+
                             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                                 <Rb_Button
                                     variant="secondary"
                                     className="w-full sm:w-auto"
-                                    onClick={handleBackToCart}
+                                    onClick={
+                                        handleBackToCart
+                                    }
                                 >
                                     Cancel
                                 </Rb_Button>
 
                                 <Rb_Button
                                     className="w-full sm:w-auto"
-                                    disabled={!checkoutData.shippingAddress || !isAddressValid}
-                                    onClick={() => setStep("review")}
+                                    disabled={
+                                        !checkoutData.shippingAddress ||
+                                        !isAddressValid
+                                    }
+                                    onClick={() =>
+                                        setStep("review")
+                                    }
                                 >
                                     Continue to Review
                                 </Rb_Button>
                             </div>
                         </>
                     )}
-                    {step === "review" && checkoutData.amount && (
-                        <>
-                            <Rb_Button
-                                variant="outline"
-                                size="sm"
-                                leftIcon={<FaArrowLeft />}
-                                onClick={() => setStep("address")}
-                                className="mb-4"
-                            >
-                                Back to Address
-                            </Rb_Button>
 
-                            <ReviewStep />
-
-                            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                    {/* REVIEW */}
+                    {step === "review" &&
+                        checkoutData.amount && (
+                            <>
                                 <Rb_Button
-                                    variant="secondary"
-                                    className="w-full sm:w-auto"
-                                    onClick={handleBackToCart}
+                                    variant="outline"
+                                    size="sm"
+                                    leftIcon={
+                                        <FaArrowLeft />
+                                    }
+                                    onClick={() =>
+                                        setStep("address")
+                                    }
+                                    className="mb-4"
                                 >
-                                    Cancel
+                                    Back to Address
                                 </Rb_Button>
 
+                                <ReviewStep />
+
+                                <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                                    <Rb_Button
+                                        variant="secondary"
+                                        className="w-full sm:w-auto"
+                                        onClick={
+                                            handleBackToCart
+                                        }
+                                    >
+                                        Cancel
+                                    </Rb_Button>
+
+                                    <Rb_Button
+                                        className="w-full sm:w-auto"
+                                        onClick={() =>
+                                            setStep("payment")
+                                        }
+                                    >
+                                        Continue to Payment
+                                    </Rb_Button>
+                                </div>
+                            </>
+                        )}
+
+                    {/* PAYMENT */}
+                    {step === "payment" &&
+                        checkoutData.amount && (
+                            <>
                                 <Rb_Button
-                                    className="w-full sm:w-auto"
-                                    onClick={() => setStep("payment")}
+                                    variant="outline"
+                                    size="sm"
+                                    leftIcon={
+                                        <FaArrowLeft />
+                                    }
+                                    onClick={() =>
+                                        setStep("review")
+                                    }
+                                    className="mb-4"
                                 >
-                                    Continue to Payment
+                                    Back to Review
                                 </Rb_Button>
-                            </div>
-                        </>
-                    )}
 
-                    {step === "payment" && checkoutData.amount && (
-                        <>
-                            <Rb_Button
-                                variant="outline"
-                                size="sm"
-                                leftIcon={<FaArrowLeft />}
-                                onClick={() => setStep("review")}
-                                className="mb-4"
-                            >
-                                Back to Review
-                            </Rb_Button>
-
-                            <PaymentWidgetPage />
-                        </>
-                    )}
+                                <PaymentWidgetPage />
+                            </>
+                        )}
                 </div>
             </div>
+
+            {/* RENT CART VALIDATION MODAL */}
             <Modal
-                isOpen={isValidationModalOpen}
-                onClose={() => setValidationModalOpen(false)}
+                isOpen={
+                    isValidationModalOpen &&
+                    !isAuctionCheckout
+                }
+                onClose={() =>
+                    setValidationModalOpen(false)
+                }
             >
                 <ModalHeader
-
-                    onClose={() => setValidationModalOpen(false)}
+                    onClose={() =>
+                        setValidationModalOpen(false)
+                    }
                 >
                     Cart Validation Failed
                 </ModalHeader>
 
                 <ModalBody>
-                    <Rb_Text className="mb-4 text-red-500 font-medium">
+                    <Rb_Text className="mb-4 font-medium text-red-500">
                         Some items in your cart are unavailable.
                     </Rb_Text>
 
                     <ul className="space-y-2">
-                        {invalidItemDetails.map((item) => (
-                            <li key={item.bookId}>
-                                <strong>{item.name}</strong> — {item.reason}
-                            </li>
-                        ))}
+                        {invalidItemDetails.map(
+                            (item) => (
+                                <li key={item.bookId}>
+                                    <strong>
+                                        {item.name}
+                                    </strong>{" "}
+                                    — {item.reason}
+                                </li>
+                            )
+                        )}
                     </ul>
                 </ModalBody>
 
@@ -238,7 +447,9 @@ export default function CheckoutFlowPage() {
                     <Rb_Button
                         variant="secondary"
                         onClick={() => {
-                            setValidationModalOpen(false);
+                            setValidationModalOpen(
+                                false
+                            );
                             handleBackToCart();
                         }}
                     >
@@ -247,7 +458,9 @@ export default function CheckoutFlowPage() {
 
                     <Rb_Button
                         onClick={() => {
-                            setValidationModalOpen(false);
+                            setValidationModalOpen(
+                                false
+                            );
                             runValidation();
                         }}
                     >

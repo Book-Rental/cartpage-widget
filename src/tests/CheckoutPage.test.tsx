@@ -48,6 +48,7 @@ const makeCheckoutData = (totalAmount: number) => ({
     shippingAddress: null,
     billingAddress: null,
     payment: null,
+    orderType: "rent" as const,
     amount: {
         rentalAmount: 0,
         securityDeposit: 0,
@@ -272,7 +273,7 @@ describe("CheckoutPage", () => {
             );
         });
 
-        expect(logSpy).toHaveBeenCalledWith("Payment failed", {
+        expect(logSpy).toHaveBeenCalledWith("Payment failed:", {
             reason: "declined",
         });
 
@@ -328,33 +329,37 @@ describe("CheckoutPage", () => {
     });
 
     it("logs a failure message when placeOrder errors, without clearing the cart", () => {
-        const logSpy = vi
-            .spyOn(console, "log")
-            .mockImplementation(() => { });
+    const errorSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
-        placeOrderMock.mockImplementation((_payload, options) => {
-            options?.onError?.();
-        });
-
-        renderCheckoutPage(500);
-
-        act(() => {
-            window.dispatchEvent(
-                new CustomEvent("payment-widget-success", {
-                    detail: {
-                        paymentMethod: "UPI",
-                        transactionId: "TXN123",
-                        paymentStatus: "SUCCESS",
-                    },
-                })
-            );
-        });
-
-        expect(logSpy).toHaveBeenCalledWith("Order placement failed");
-        expect(clearCartMock).not.toHaveBeenCalled();
-
-        logSpy.mockRestore();
+    placeOrderMock.mockImplementation((_payload, options) => {
+        options?.onError?.();
     });
+
+    renderCheckoutPage(500);
+
+    act(() => {
+        window.dispatchEvent(
+            new CustomEvent("payment-widget-success", {
+                detail: {
+                    paymentMethod: "UPI",
+                    transactionId: "TXN123",
+                    paymentStatus: "SUCCESS",
+                },
+            })
+        );
+    });
+
+    expect(errorSpy).toHaveBeenCalledWith(
+        "Order placement failed:",
+        undefined
+    );
+
+    expect(clearCartMock).not.toHaveBeenCalled();
+
+    errorSpy.mockRestore();
+});
 
     it("cleans up on unmount", () => {
         const { unmount } = renderCheckoutPage(100);
@@ -425,7 +430,7 @@ describe("CheckoutPage", () => {
 
         expect(placeOrderMock).not.toHaveBeenCalled();
         expect(logSpy).not.toHaveBeenCalledWith(
-            "Payment failed",
+            "Payment failed:",
             expect.anything()
         );
 

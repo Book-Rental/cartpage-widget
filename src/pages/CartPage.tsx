@@ -15,21 +15,25 @@ import { useClearCart } from "../hooks/useClearCart";
 import { showToast } from "../utils/ToastFunction";
 import { useValidateCart } from "../hooks/useValidateCart";
 import { InvalidCartItem } from "../types/cart";
+
 export default function CartPage() {
     const { data, isLoading, isError } = useCart();
     const { mutate: clearCart, isPending } = useClearCart();
+    const { mutate: validateCart } = useValidateCart();
+
     const [isClearModalOpen, setClearModalOpen] = useState(false);
-
-
     const [invalidItems, setInvalidItems] = useState<InvalidCartItem[]>([]);
     const [showValidationModal, setShowValidationModal] = useState(false);
 
-    const { mutate: validateCart } = useValidateCart();
+    const historyState = window.history.state;
+
+    const isAuction = historyState?.orderType === "auction";
 
     useEffect(() => {
         const event = new CustomEvent("widget-loading-status", {
-            detail: isLoading
+            detail: isLoading,
         });
+
         window.dispatchEvent(event);
     }, [isLoading]);
 
@@ -57,22 +61,34 @@ export default function CartPage() {
             },
         });
     };
+
     const handleCheckout = () => {
         validateCart(undefined, {
             onSuccess: ({ isValid, invalidItems }) => {
                 if (isValid) {
-                    window.history.pushState({}, "", "/checkout");
-                    window.dispatchEvent(new PopStateEvent("popstate"));
+                    window.history.pushState(
+                        window.history.state,
+                        "",
+                        "/checkout"
+                    );
+
+                    window.dispatchEvent(
+                        new PopStateEvent("popstate")
+                    );
                 } else {
                     setInvalidItems(invalidItems);
                     setShowValidationModal(true);
                 }
             },
             onError: () => {
-                showToast("Failed to validate cart", "error");
+                showToast(
+                    "Failed to validate cart",
+                    "error"
+                );
             },
         });
     };
+
     const clearItemError = (bookId: string) => {
         setInvalidItems((prev) =>
             prev.filter((item) => item.bookId !== bookId)
@@ -83,56 +99,75 @@ export default function CartPage() {
                 setInvalidItems(invalidItems);
             },
             onError: () => {
-                showToast("Failed to validate cart", "error");
+                showToast(
+                    "Failed to validate cart",
+                    "error"
+                );
             },
         });
     };
 
     return (
-        <div className=" w-full px-4 py-6 sm:px-6 lg:px-8">
+        <div className="w-full px-4 py-6 sm:px-6 lg:px-8">
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-[3fr_1.1fr]">
                 <div>
                     <div className="rounded-xl border border-gray-200 bg-white p-6">
                         <div className="mb-6 flex items-center justify-between">
                             <h1 className="text-2xl font-semibold">
                                 Your Cart ({data.items.length}{" "}
-                                {data.items.length === 1 ? "Item" : "Items"})
-                            </h1>
-                            {
-                                data.items.length === 0 ? null : (
-                                    <Rb_Button
-                                        variant="outline"
-                                        onClick={() => setClearModalOpen(true)}
-                                        disabled={isPending}
-                                    >
-                                        Clear Cart
-                                    </Rb_Button>
+                                {data.items.length === 1
+                                    ? "Item"
+                                    : "Items"}
                                 )
-                            }
+                            </h1>
 
+                            {data.items.length > 0 && (
+                                <Rb_Button
+                                    variant="outline"
+                                    onClick={() =>
+                                        setClearModalOpen(true)
+                                    }
+                                    disabled={isPending}
+                                >
+                                    Clear Cart
+                                </Rb_Button>
+                            )}
                         </div>
 
                         {data.items.length === 0 ? (
                             <div className="flex flex-col items-center gap-4 py-10">
-                                <p className="text-gray-500">Your cart is empty.</p>
-                                <Rb_Button onClick={handleBrowseBooks}>
+                                <p className="text-gray-500">
+                                    Your cart is empty.
+                                </p>
+
+                                <Rb_Button
+                                    onClick={handleBrowseBooks}
+                                >
                                     Browse Books
                                 </Rb_Button>
                             </div>
                         ) : (
                             <div className="space-y-6">
                                 {data.items.map((item) => {
-                                    const invalid = invalidItems.find(
-                                        (i) => i.bookId === item.bookId._id
-                                    );
+                                    const invalid =
+                                        invalidItems.find(
+                                            (i) =>
+                                                i.bookId ===
+                                                item.bookId._id
+                                        );
 
                                     return (
                                         <CartItem
                                             key={item.bookId._id}
                                             item={item}
-                                            errorMessage={invalid?.reason}
-                                            onValidationSuccess={() => clearItemError(item.bookId._id)}
-
+                                            errorMessage={
+                                                invalid?.reason
+                                            }
+                                            onValidationSuccess={() =>
+                                                clearItemError(
+                                                    item.bookId._id
+                                                )
+                                            }
                                         />
                                     );
                                 })}
@@ -146,6 +181,11 @@ export default function CartPage() {
                         summary={data.summary}
                         itemCount={data.items.length}
                         onCheckout={handleCheckout}
+                        orderType={
+                            isAuction
+                                ? "auction"
+                                : "rent"
+                        }
                     />
                 </div>
             </div>
@@ -154,18 +194,23 @@ export default function CartPage() {
                 isOpen={isClearModalOpen}
                 onClose={() => setClearModalOpen(false)}
             >
-                <ModalHeader onClose={() => setClearModalOpen(false)}>
+                <ModalHeader
+                    onClose={() => setClearModalOpen(false)}
+                >
                     Clear Cart
                 </ModalHeader>
 
                 <ModalBody>
-                    Are you sure you want to remove all books from your cart?
+                    Are you sure you want to remove all books from
+                    your cart?
                 </ModalBody>
 
                 <ModalFooter>
                     <Rb_Button
                         variant="secondary"
-                        onClick={() => setClearModalOpen(false)}
+                        onClick={() =>
+                            setClearModalOpen(false)
+                        }
                     >
                         Cancel
                     </Rb_Button>
@@ -182,10 +227,14 @@ export default function CartPage() {
 
             <Modal
                 isOpen={showValidationModal}
-                onClose={() => setShowValidationModal(false)}
+                onClose={() =>
+                    setShowValidationModal(false)
+                }
             >
                 <ModalHeader
-                    onClose={() => setShowValidationModal(false)}
+                    onClose={() =>
+                        setShowValidationModal(false)
+                    }
                 >
                     Cart Validation Failed
                 </ModalHeader>
@@ -196,7 +245,9 @@ export default function CartPage() {
 
                 <ModalFooter>
                     <Rb_Button
-                        onClick={() => setShowValidationModal(false)}
+                        onClick={() =>
+                            setShowValidationModal(false)
+                        }
                     >
                         OK
                     </Rb_Button>

@@ -6,101 +6,185 @@ export default function ReviewStep() {
 
     const { shippingAddress, amount } = checkoutData;
 
+    const isAuction =
+        checkoutData.orderType === "auction";
+
     return (
         <div className="space-y-6">
-            <div className="rounded-lg border border-gray-200 p-4">
-                <Rb_Text
-                    variant="h4"
-                    className="mb-2 font-semibold"
-                >
-                    Delivery Address
-                </Rb_Text>
 
-                {shippingAddress ? (
-                    <div className="space-y-1">
-                        <Rb_Text className="font-medium">
-                            {shippingAddress.name}
-                        </Rb_Text>
-
-                        <Rb_Text className="text-sm text-gray-600">
-                            {shippingAddress.addressLine1}
-                        </Rb_Text>
-
-                        {shippingAddress.addressLine2 && (
-                            <Rb_Text className="text-sm text-gray-600">
-                                {shippingAddress.addressLine2}
-                            </Rb_Text>
-                        )}
-
-                        {shippingAddress.landmark && (
-                            <Rb_Text className="text-sm text-gray-600">
-                                Landmark: {shippingAddress.landmark}
-                            </Rb_Text>
-                        )}
-
-                        <Rb_Text className="text-sm text-gray-600">
-                            {shippingAddress.city},{" "}
-                            {shippingAddress.state} -{" "}
-                            {shippingAddress.zipCode}
-                        </Rb_Text>
-
-                        <Rb_Text className="text-sm text-gray-600">
-                            {shippingAddress.country}
-                        </Rb_Text>
-
-                        <Rb_Text className="text-sm text-gray-600">
-                            Phone: {shippingAddress.phone}
-                        </Rb_Text>
-
-                        <Rb_Text className="text-xs text-gray-500 capitalize">
-                            {shippingAddress.type} Address
-                        </Rb_Text>
-                    </div>
-                ) : (
-                    <Rb_Text className="text-sm text-red-500">
-                        No address selected
-                    </Rb_Text>
-                )}
-            </div>
-
+            {/* SHIPPING ADDRESS */}
             <div className="rounded-lg border border-gray-200 p-4">
                 <Rb_Text
                     variant="h4"
                     className="mb-3 font-semibold"
                 >
-                    Order Summary
+                    Shipping Address
                 </Rb_Text>
 
+               {shippingAddress && (
+  <div className="text-sm text-gray-600">
+    <p>{shippingAddress.name}</p>
+
+    <p>{shippingAddress.addressLine1}</p>
+
+    {shippingAddress.addressLine2 && (
+      <p>{shippingAddress.addressLine2}</p>
+    )}
+
+    <p>
+      {shippingAddress.city}, {shippingAddress.state}
+    </p>
+
+    <p>
+      {shippingAddress.country} - {shippingAddress.zipCode}
+    </p>
+
+    <p>
+      Phone: {shippingAddress.phone}
+    </p>
+  </div>
+)}
+            </div>
+
+            {/* ORDER SUMMARY */}
+            <div className="rounded-lg border border-gray-200 p-4">
+
+                <div className="mb-4 flex items-center justify-between">
+                    <Rb_Text
+                        variant="h4"
+                        className="font-semibold"
+                    >
+                        Order Summary
+                    </Rb_Text>
+
+                    <span
+                        className={`rounded-full px-3 py-1 text-xs font-medium ${
+                            isAuction
+                                ? "bg-purple-100 text-purple-700"
+                                : "bg-blue-100 text-blue-700"
+                        }`}
+                    >
+                        {isAuction
+                            ? "Auction"
+                            : "Rent"}
+                    </span>
+                </div>
+
                 {amount && (
-                    <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                            <span>Rental Amount</span>
-                            <span>₹{amount.rentalAmount}</span>
-                        </div>
+                    <div className="space-y-3 text-sm">
 
-                        <div className="flex justify-between">
-                            <span>Security Deposit</span>
-                            <span>₹{amount.securityDeposit}</span>
-                        </div>
+                        {isAuction ? (
+                            <>
+                                <div className="flex justify-between">
+                                    <span>
+                                        Winning Bid
+                                    </span>
 
-                        <div className="flex justify-between">
-                            <span>Delivery Charges</span>
-                            <span>₹{amount.deliveryFee}</span>
-                        </div>
+                                    <span>
+                                        ₹
+                                        {amount.itemAmount}
+                                    </span>
+                                </div>
 
-                        <div className="flex justify-between">
-                            <span>Discount</span>
-                            <span>₹{amount.discount}</span>
-                        </div>
+                                <div className="flex justify-between">
+                                    <span>
+                                        Delivery Charges
+                                    </span>
 
-                        <div className="flex justify-between">
-                            <span>Tax</span>
-                            <span>₹{amount.tax.toFixed(2)}</span>
-                        </div>
+                                    <span>
+                                        ₹
+                                        {amount.deliveryFee}
+                                    </span>
+                                </div>
 
-                        <div className="flex justify-between border-t pt-2 font-bold">
+                                <div className="flex justify-between">
+                                    <span>
+                                        Discount
+                                    </span>
+
+                                    <span>
+                                        ₹
+                                        {amount.discount}
+                                    </span>
+                                </div>
+
+                                <div className="flex justify-between">
+                                    <span>
+                                        Tax
+                                    </span>
+
+                                    <span>
+                                        ₹
+                                        {amount.tax.toFixed(2)}
+                                    </span>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="flex justify-between">
+                                    <span>
+                                        Rental Amount
+                                    </span>
+
+                                    <span>
+                                        ₹
+                                        {amount.rentalAmount}
+                                    </span>
+                                </div>
+
+                                <div className="flex justify-between">
+                                    <span>
+                                        Security Deposit
+                                    </span>
+
+                                    <span>
+                                        ₹
+                                        {amount.securityDeposit}
+                                    </span>
+                                </div>
+
+                                <div className="flex justify-between">
+                                    <span>
+                                        Delivery Charges
+                                    </span>
+
+                                    <span>
+                                        ₹
+                                        {amount.deliveryFee}
+                                    </span>
+                                </div>
+
+                                <div className="flex justify-between">
+                                    <span>
+                                        Discount
+                                    </span>
+
+                                    <span>
+                                        ₹
+                                        {amount.discount}
+                                    </span>
+                                </div>
+
+                                <div className="flex justify-between">
+                                    <span>
+                                        Tax
+                                    </span>
+
+                                    <span>
+                                        ₹
+                                        {amount.tax.toFixed(2)}
+                                    </span>
+                                </div>
+                            </>
+                        )}
+
+                        <div className="flex justify-between border-t pt-3 font-bold">
                             <span>Total</span>
-                            <span>₹{amount.totalAmount}</span>
+
+                            <span>
+                                ₹
+                                {amount.totalAmount}
+                            </span>
                         </div>
                     </div>
                 )}

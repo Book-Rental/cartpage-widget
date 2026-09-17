@@ -1,148 +1,473 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { Rb_LoadingSpinner } from "@rentbook/rentbook-ui-lib";
+
 import { useCheckout } from "../hooks/CheckoutContext";
 import { usePlaceOrder } from "../hooks/usePlaceOrder";
 import { useClearCart } from "../hooks/useClearCart";
-import { Rb_LoadingSpinner } from "@rentbook/rentbook-ui-lib";
-
+import { CheckoutRequest } from "../types/checkout";
 
 const CheckoutPage: React.FC = () => {
-    const paymentWidgetUrl = import.meta.env.VITE_PAYMENT_WIDGET_URL;
-    const returnUrl = import.meta.env.VITE_RETURN_URL;
+  const paymentWidgetUrl =
+    import.meta.env.VITE_PAYMENT_WIDGET_URL;
 
-    const { checkoutData, setCheckoutData } = useCheckout();
-    const { mutate: clearCart, isPending } = useClearCart();
-    const totalAmount = checkoutData.amount?.totalAmount ?? 0;
-    const { mutate: placeOrder } = usePlaceOrder();
-    // Load Payment Widget
-    useEffect(() => {
-        if (!paymentWidgetUrl) return;
+  const returnUrl =
+    import.meta.env.VITE_RETURN_URL;
 
-        const containerId = "test-widget-container";
+  const baseUrl =
+    import.meta.env.VITE_API_BASE_URL;
 
-        const container = document.getElementById(containerId);
+  const { checkoutData, setCheckoutData } =
+    useCheckout();
 
-        if (!container) return;
+  const { mutate: clearCart, isPending } =
+    useClearCart();
 
-        container.setAttribute("data-price", String(totalAmount));
-        container.setAttribute("data-merchant-name", "RentBook");
-        container.setAttribute("data-currency", "INR");
-        container.setAttribute("data-return-url", returnUrl);
-        container.setAttribute("data-no-forwarding-path", "true");
+  const { mutate: placeOrder } =
+    usePlaceOrder();
 
-        const script = document.createElement("script");
-        script.src = paymentWidgetUrl;
-        script.async = true;
+  const [auctionLoading, setAuctionLoading] =
+    useState(false);
 
-        script.onload = () => {
-            window.renderReactWidget?.(
-                JSON.stringify({
-                    containerElementId: containerId,
-                })
-            );
-        };
+  const [auctionBookId, setAuctionBookId] =
+    useState("");
 
-        document.body.appendChild(script);
+  const [currentBidPrice, setCurrentBidPrice] =
+    useState(0);
 
-        return () => {
-            window.unmountReactWidget?.(containerId);
+  /* --------------------------------
+     Auction checkout information
+  -------------------------------- */
 
-            if (document.body.contains(script)) {
-                document.body.removeChild(script);
-            }
-        };
-    }, [paymentWidgetUrl, returnUrl, totalAmount]);
+  const historyState = window.history.state;
 
-    // Listen for Payment Success
-    useEffect(() => {
-        const createOrder = (
-            paymentMethod: string,
-            transactionId: string,
-            paymentStatus: string
-        ) => {
-            const payment = {
-                paymentMethod,
-                transactionId,
-                paymentStatus,
-            };
+  const isAuctionCheckout =
+    historyState?.orderType === "auction";
 
-            const payload = {
-                ...checkoutData,
-                payment,
-            };
+  const auctionId =
+    historyState?.auctionId;
 
-            setCheckoutData(payload);
+  const userId =
+    historyState?.userId ||
+    window.HOST_USER_INFO?._id ||
+    checkoutData.userId ||
+    "";
 
-            placeOrder(payload, {
-                onSuccess: () => {
-                    console.log("Order placed successfully");
-                    clearCart();
-                    window.history.pushState({}, "", "/OrderConform");
-                    window.dispatchEvent(new PopStateEvent("popstate"));
-                },
-                onError: () => {
-                    console.log("Order placement failed");
-                },
-            });
-        };
+  /* --------------------------------
+     Auction amount calculation
+  -------------------------------- */
 
-        const handlePaymentSuccess = (event: Event) => {
-            const customEvent = event as CustomEvent;
+  const auctionDeliveryFee =
+    checkoutData.amount?.deliveryFee ?? 0;
 
-            const {
-                paymentMethod,
-                transactionId,
-                paymentStatus,
-            } = customEvent.detail;
+  const auctionDiscount = 0;
 
-            createOrder(
-                paymentMethod,
-                transactionId,
-                paymentStatus ?? "SUCCESS"
-            );
-        };
+  const auctionSecurityDeposit = 0;
 
-        const handlePaymentFailure = (event: Event) => {
-            const customEvent = event as CustomEvent;
+  const auctionTax =
+    currentBidPrice * 0.05;
 
-            console.log("Payment failed", customEvent.detail);
+  const auctionTotalAmount =
+    currentBidPrice +
+    auctionDeliveryFee +
+    auctionTax;
 
-            createOrder(
-                "COD",
-                "",
-                "FAILED"
-            );
-        };
+  /* --------------------------------
+     Payment amount
+  -------------------------------- */
 
-        window.addEventListener(
-            "payment-widget-success",
-            handlePaymentSuccess
+  const totalAmount = isAuctionCheckout
+    ? auctionTotalAmount
+    : checkoutData.amount?.totalAmount ?? 0;
+
+  /* --------------------------------
+     Fetch auction details
+  -------------------------------- */
+
+  useEffect(() => {
+    if (!isAuctionCheckout) {
+      return;
+    }
+
+    if (!auctionId) {
+      console.error("Auction ID not found");
+      return;
+    }
+
+    const fetchAuctionDetails = async () => {
+      try {
+        setAuctionLoading(true);
+
+        const response = await fetch(
+          `${baseUrl}/auction/${auctionId}/bids`,
+          {
+            method: "GET",
+            credentials: "include",
+          }
         );
 
-        window.addEventListener(
-            "payment-widget-failure",
-            handlePaymentFailure
+        const result = await response.json();
+
+        console.log(
+          "Auction bids response:",
+          result
         );
 
-        return () => {
-            window.removeEventListener(
-                "payment-widget-success",
-                handlePaymentSuccess
-            );
+        if (!response.ok) {
+          throw new Error(
+            result.message ||
+              "Failed to fetch auction bids"
+          );
+        }
 
-            window.removeEventListener(
-                "payment-widget-failure",
-                handlePaymentFailure
-            );
-        };
-    }, [checkoutData, setCheckoutData, placeOrder, clearCart]);
+        const auction =
+          result.data?.auction;
 
-    if (isPending) return <><Rb_LoadingSpinner></Rb_LoadingSpinner></>
-    return (
-        <div
-            id="test-widget-container"
-            className="mb-6"
-        />
+        const book =
+          result.data?.book;
+
+        if (!auction || !book) {
+          throw new Error(
+            "Auction or book details not found"
+          );
+        }
+
+        setAuctionBookId(book._id);
+
+        setCurrentBidPrice(
+          auction.currentBidPrice ?? 0
+        );
+
+        console.log(
+          "Auction bookId:",
+          book._id
+        );
+
+        console.log(
+          "Current bid price:",
+          auction.currentBidPrice
+        );
+      } catch (error) {
+        console.error(
+          "Auction details API failed:",
+          error
+        );
+      } finally {
+        setAuctionLoading(false);
+      }
+    };
+
+    fetchAuctionDetails();
+  }, [
+    isAuctionCheckout,
+    auctionId,
+    baseUrl,
+  ]);
+
+  /* --------------------------------
+     Load payment widget
+  -------------------------------- */
+
+  useEffect(() => {
+    if (!paymentWidgetUrl) {
+      return;
+    }
+
+    if (
+      isAuctionCheckout &&
+      auctionLoading
+    ) {
+      return;
+    }
+
+    const containerId =
+      "test-widget-container";
+
+    const container =
+      document.getElementById(containerId);
+
+    if (!container) {
+      return;
+    }
+
+    container.setAttribute(
+      "data-price",
+      String(totalAmount)
     );
+
+    container.setAttribute(
+      "data-merchant-name",
+      "RentBook"
+    );
+
+    container.setAttribute(
+      "data-currency",
+      "INR"
+    );
+
+    container.setAttribute(
+      "data-return-url",
+      returnUrl
+    );
+
+    container.setAttribute(
+      "data-no-forwarding-path",
+      "true"
+    );
+
+    const script =
+      document.createElement("script");
+
+    script.src = paymentWidgetUrl;
+    script.async = true;
+
+    script.onload = () => {
+      window.renderReactWidget?.(
+        JSON.stringify({
+          containerElementId:
+            containerId,
+        })
+      );
+    };
+
+    document.body.appendChild(script);
+
+    return () => {
+      window.unmountReactWidget?.(
+        containerId
+      );
+
+      if (
+        document.body.contains(script)
+      ) {
+        document.body.removeChild(
+          script
+        );
+      }
+    };
+  }, [
+    paymentWidgetUrl,
+    returnUrl,
+    totalAmount,
+    isAuctionCheckout,
+    auctionLoading,
+  ]);
+
+  /* --------------------------------
+     Create order after payment
+  -------------------------------- */
+
+  useEffect(() => {
+    const createOrder = (
+      paymentMethod: string,
+      transactionId: string,
+      paymentStatus: string
+    ) => {
+     const payload: CheckoutRequest = {
+  userId:
+    checkoutData.userId ||
+    userId,
+
+  items: isAuctionCheckout
+    ? [
+        {
+          bookId: auctionBookId,
+          quantity: 1,
+        },
+      ]
+    : checkoutData.items,
+
+  shippingAddress:
+    checkoutData.shippingAddress,
+
+  billingAddress:
+    checkoutData.billingAddress,
+
+  orderType: isAuctionCheckout
+    ? "auction"
+    : "rent",
+
+  ...(isAuctionCheckout && {
+    auctionId,
+  }),
+
+  payment: {
+    paymentMethod,
+    transactionId,
+    paymentStatus,
+  },
+
+  amount: isAuctionCheckout
+    ? {
+        itemAmount:
+          currentBidPrice,
+
+        rentalAmount: 0,
+
+        securityDeposit:
+          auctionSecurityDeposit,
+
+        deliveryFee:
+          auctionDeliveryFee,
+
+        discount:
+          auctionDiscount,
+
+        tax:
+          auctionTax,
+
+        totalAmount:
+          auctionTotalAmount,
+      }
+    : checkoutData.amount,
+};
+
+      console.log(
+        "Final order payload:",
+        payload
+      );
+
+      /*
+       * Preserve the existing checkout data.
+       * Only add auction orderType when this
+       * is actually an auction checkout.
+       */
+      setCheckoutData({
+        ...checkoutData,
+        ...payload,
+        ...(isAuctionCheckout && {
+          orderType: "auction",
+        }),
+      });
+
+      placeOrder(payload, {
+        onSuccess: () => {
+          console.log(
+            "Order placed successfully"
+          );
+
+          clearCart();
+
+          window.history.pushState(
+            {},
+            "",
+            "/OrderConform"
+          );
+
+          window.dispatchEvent(
+            new PopStateEvent("popstate")
+          );
+        },
+
+        onError: (error) => {
+          console.error(
+            "Order placement failed:",
+            error
+          );
+        },
+      });
+    };
+
+    /* --------------------------------
+       Payment success
+    -------------------------------- */
+
+    const handlePaymentSuccess = (
+      event: Event
+    ) => {
+      const customEvent =
+        event as CustomEvent;
+
+      const {
+        paymentMethod,
+        transactionId,
+        paymentStatus,
+      } = customEvent.detail;
+
+      createOrder(
+        paymentMethod,
+        transactionId,
+        paymentStatus ?? "SUCCESS"
+      );
+    };
+
+    /* --------------------------------
+       Payment failure
+    -------------------------------- */
+
+    const handlePaymentFailure = (
+      event: Event
+    ) => {
+      const customEvent =
+        event as CustomEvent;
+
+      console.log(
+        "Payment failed:",
+        customEvent.detail
+      );
+
+      createOrder(
+        "COD",
+        "",
+        "FAILED"
+      );
+    };
+
+    window.addEventListener(
+      "payment-widget-success",
+      handlePaymentSuccess
+    );
+
+    window.addEventListener(
+      "payment-widget-failure",
+      handlePaymentFailure
+    );
+
+    return () => {
+      window.removeEventListener(
+        "payment-widget-success",
+        handlePaymentSuccess
+      );
+
+      window.removeEventListener(
+        "payment-widget-failure",
+        handlePaymentFailure
+      );
+    };
+  }, [
+    checkoutData,
+    userId,
+    isAuctionCheckout,
+    auctionId,
+    auctionBookId,
+    currentBidPrice,
+    auctionDeliveryFee,
+    auctionDiscount,
+    auctionSecurityDeposit,
+    auctionTax,
+    auctionTotalAmount,
+    setCheckoutData,
+    placeOrder,
+    clearCart,
+  ]);
+
+  /* --------------------------------
+     Loading
+  -------------------------------- */
+
+  if (auctionLoading) {
+    return <Rb_LoadingSpinner />;
+  }
+
+  if (isPending) {
+    return <Rb_LoadingSpinner />;
+  }
+
+  return (
+    <div
+      id="test-widget-container"
+      className="mb-6"
+    />
+  );
 };
 
 export default CheckoutPage;

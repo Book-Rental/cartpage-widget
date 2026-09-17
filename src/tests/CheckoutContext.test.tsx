@@ -22,6 +22,7 @@ function TestComponent() {
     return (
         <>
             <div data-testid="step">{step}</div>
+
             <div data-testid="userId">
                 {checkoutData.userId}
             </div>
@@ -36,11 +37,12 @@ function TestComponent() {
                 onClick={() =>
                     setCheckoutData({
                         userId: "user123",
+                        orderType: "rent",
                         items: [
                             {
-                                bookId: "book1",
-                                quantity: 2,
-                                rentalType: "monthly",
+                                bookId: "book123",
+                                quantity: 1,
+                                rentalType: "week",
                             },
                         ],
                         shippingAddress: null,
@@ -49,10 +51,10 @@ function TestComponent() {
                         amount: {
                             rentalAmount: 100,
                             securityDeposit: 50,
-                            deliveryFee: 20,
-                            discount: 10,
-                            tax: 18,
-                            totalAmount: 178,
+                            deliveryFee: 10,
+                            discount: 0,
+                            tax: 20,
+                            totalAmount: 180,
                         },
                     })
                 }
