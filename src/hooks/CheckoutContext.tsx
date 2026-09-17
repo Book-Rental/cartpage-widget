@@ -31,6 +31,7 @@ const initialCheckoutData: CheckoutRequest = {
     billingAddress: null,
     payment: null,
     amount: null,
+    orderType: "rent",
 };
 
 export const CheckoutContext = createContext<

@@ -1,11 +1,9 @@
-// src/types/checkout.ts
-
 import { Address } from "./cart";
 
 export interface CheckoutItem {
     bookId: string;
     quantity: number;
-    rentalType: string;
+    rentalType?: string;
 }
 
 export interface PaymentDetails {
@@ -15,7 +13,8 @@ export interface PaymentDetails {
 }
 
 export interface AmountDetails {
-    rentalAmount: number;
+    itemAmount?: number;
+    rentalAmount?: number;
     securityDeposit: number;
     deliveryFee: number;
     discount: number;
@@ -28,6 +27,10 @@ export interface CheckoutRequest {
     items: CheckoutItem[];
     shippingAddress: Address | null;
     billingAddress: Address | null;
+
+    orderType: "rent" | "auction";
+    auctionId?: string;
+
     payment: PaymentDetails | null;
     amount: AmountDetails | null;
 }

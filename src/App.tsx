@@ -8,28 +8,36 @@ import CheckoutFlowPage from "./pages/CheckoutFlowPage";
 import OrderSuccessPage from "./pages/OrderSuccessPage";
 import { CheckoutProvider } from "./hooks/CheckoutContext";
 
-
 type View = "cart" | "checkout" | "success";
 
 type AppProps = {
-  view?: View;
+    view?: View;
 };
 
 const queryClient = new QueryClient();
 
 function App({ view = "cart" }: AppProps) {
+    const checkoutData = window.history.state;
 
-  return (
-    <QueryClientProvider client={queryClient}>
-      <CheckoutProvider>
-        {view === "cart" && <CartPage />}
+    if (
+        view === "checkout" &&
+        checkoutData?.orderType === "auction"
+    ) {
+        console.log("Auction checkout");
+        console.log("Checkout data:", checkoutData);
+    }
 
-        {view === "checkout" && <CheckoutFlowPage />}
+    return (
+        <QueryClientProvider client={queryClient}>
+            <CheckoutProvider>
+                {view === "cart" && <CartPage />}
 
-        {view === "success" && <OrderSuccessPage />}
-      </CheckoutProvider>
-    </QueryClientProvider>
-  );
+                {view === "checkout" && <CheckoutFlowPage />}
+
+                {view === "success" && <OrderSuccessPage />}
+            </CheckoutProvider>
+        </QueryClientProvider>
+    );
 }
 
 export default App;

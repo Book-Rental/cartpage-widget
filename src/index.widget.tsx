@@ -6,7 +6,7 @@ export interface WidgetOptions {
     containerElementId: string,
     name: string;
     view: "cart" | "checkout" | "success";
-
+    OrderType: "" | "auction"
 }
 
 declare global {
@@ -61,7 +61,7 @@ window.renderReactWidget = (config: string) => {
     const root = createRoot(container);
     root.render(
         <React.StrictMode>
-            <App view={finalOptions.view} />
+            <App view={finalOptions.view}/>
         </React.StrictMode>
     )
     widgetRoots[containerId] = root;
