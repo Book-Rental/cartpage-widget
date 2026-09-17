@@ -1,5 +1,5 @@
 import type { ReactNode, ButtonHTMLAttributes, HTMLAttributes } from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import OrderSummary from "../components/OrderSummary";
 import { CartSummary } from "../types/cart";
@@ -48,7 +48,177 @@ const renderComponent = (itemCount = 2, summary = mockSummary) =>
 
 const pushStateSpy = vi.spyOn(window.history, "pushState");
 const dispatchEventSpy = vi.spyOn(window, "dispatchEvent");
+it("renders auction summary and fetches current bid", async () => {
+    vi.stubEnv(
+        "VITE_API_URL",
+        "https://example.com"
+    );
 
+    window.history.replaceState(
+        {
+            auctionId: "auction123",
+            orderType: "auction",
+        },
+        "",
+        "/cart"
+    );
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+            data: {
+                auction: {
+                    currentBidPrice: 3656,
+                },
+            },
+        }),
+    } as Response);
+
+    render(
+        <OrderSummary
+            summary={mockSummary}
+            itemCount={1}
+            onCheckout={onCheckoutMock}
+            orderType="auction"
+        />
+    );
+
+    expect(
+        screen.getByText("Auction")
+    ).toBeInTheDocument();
+
+    expect(
+        screen.getByText("Winning Bid")
+    ).toBeInTheDocument();
+
+    await waitFor(() => {
+        expect(
+            screen.getByText("₹3656")
+        ).toBeInTheDocument();
+    });
+});
+
+it("handles missing auction id", () => {
+    window.history.replaceState(
+        {
+            orderType: "auction",
+        },
+        "",
+        "/cart"
+    );
+
+    const errorSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+    globalThis.fetch = vi.fn();
+
+    render(
+        <OrderSummary
+            summary={mockSummary}
+            itemCount={1}
+            onCheckout={onCheckoutMock}
+            orderType="auction"
+        />
+    );
+
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+
+    expect(errorSpy).toHaveBeenCalledWith(
+        "Auction ID is missing from window.history.state"
+    );
+
+    errorSpy.mockRestore();
+});
+
+it("handles auction fetch failure", async () => {
+    vi.stubEnv(
+        "VITE_API_URL",
+        "https://example.com"
+    );
+
+    window.history.replaceState(
+        {
+            auctionId: "auction123",
+            orderType: "auction",
+        },
+        "",
+        "/cart"
+    );
+
+    const errorSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+    } as Response);
+
+    render(
+        <OrderSummary
+            summary={mockSummary}
+            itemCount={1}
+            onCheckout={onCheckoutMock}
+            orderType="auction"
+        />
+    );
+
+    await waitFor(() => {
+        expect(errorSpy).toHaveBeenCalledWith(
+            "FAILED TO FETCH CURRENT BID:",
+            expect.any(Error)
+        );
+    });
+
+    errorSpy.mockRestore();
+});
+
+it("keeps auction bid at zero when API returns invalid price", async () => {
+    vi.stubEnv(
+        "VITE_API_URL",
+        "https://example.com"
+    );
+
+    window.history.replaceState(
+        {
+            auctionId: "auction123",
+            orderType: "auction",
+        },
+        "",
+        "/cart"
+    );
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+            data: {
+                auction: {
+                    currentBidPrice: "invalid",
+                },
+            },
+        }),
+    } as Response);
+
+    render(
+        <OrderSummary
+            summary={mockSummary}
+            itemCount={1}
+            onCheckout={onCheckoutMock}
+            orderType="auction"
+        />
+    );
+
+    await waitFor(() => {
+        expect(globalThis.fetch).toHaveBeenCalled();
+    });
+
+    const winningBidRow = screen
+    .getByText("Winning Bid")
+    .closest("div");
+
+expect(winningBidRow).toHaveTextContent("₹0");
+});
 describe("OrderSummary", () => {
     beforeEach(() => {
         onCheckoutMock.mockClear();

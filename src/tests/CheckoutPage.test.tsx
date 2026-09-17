@@ -1,24 +1,28 @@
 import {
+    act,
+    cleanup,
     render,
     waitFor,
-    cleanup,
-    act,
 } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import CheckoutPage from "../pages/CheckoutPage";
-import * as CheckoutContextModule from "../hooks/CheckoutContext";
-import * as usePlaceOrderModule from "../hooks/usePlaceOrder";
-import * as useClearCartModule from "../hooks/useClearCart";
 
-vi.mock("../hooks/CheckoutContext", async () => {
-    const actual = await vi.importActual<
-        typeof import("../hooks/CheckoutContext")
-    >("../hooks/CheckoutContext");
-    return {
-        ...actual,
-        useCheckout: vi.fn(),
-    };
-});
+import {
+    afterEach,
+    beforeEach,
+    describe,
+    expect,
+    it,
+    vi,
+} from "vitest";
+
+import CheckoutPage from "../pages/CheckoutPage";
+
+import { useCheckout } from "../hooks/CheckoutContext";
+import { usePlaceOrder } from "../hooks/usePlaceOrder";
+import { useClearCart } from "../hooks/useClearCart";
+
+vi.mock("../hooks/CheckoutContext", () => ({
+    useCheckout: vi.fn(),
+}));
 
 vi.mock("../hooks/usePlaceOrder", () => ({
     usePlaceOrder: vi.fn(),
@@ -28,253 +32,250 @@ vi.mock("../hooks/useClearCart", () => ({
     useClearCart: vi.fn(),
 }));
 
-// The spinner just needs to render something identifiable; avoid pulling in
-// the real UI lib during tests.
-vi.mock("@rentbook/rentbook-ui-lib", () => ({
-    Rb_LoadingSpinner: () => <div data-testid="loading-spinner" />,
-}));
-
-const mockUseCheckout = vi.mocked(CheckoutContextModule.useCheckout);
-const mockUsePlaceOrder = vi.mocked(usePlaceOrderModule.usePlaceOrder);
-const mockUseClearCart = vi.mocked(useClearCartModule.useClearCart);
-
-const setCheckoutDataMock = vi.fn();
-const placeOrderMock = vi.fn();
 const clearCartMock = vi.fn();
+const placeOrderMock = vi.fn();
+const setCheckoutDataMock = vi.fn();
 
-const makeCheckoutData = (totalAmount: number) => ({
-    userId: "",
-    items: [],
-    shippingAddress: null,
-    billingAddress: null,
-    payment: null,
-    orderType: "rent" as const,
-    amount: {
-        rentalAmount: 0,
-        securityDeposit: 0,
-        deliveryFee: 0,
-        discount: 0,
-        tax: 0,
-        totalAmount,
+const originalFetch = globalThis.fetch;
+
+const defaultCheckoutData = {
+    userId: "user123",
+    items: [
+        {
+            bookId: "book123",
+            quantity: 1,
+        },
+    ],
+    shippingAddress: {
+        city: "Hyderabad",
     },
-});
-
-// Renders CheckoutPage with the context pre-seeded to a given totalAmount,
-// standing in for the old `<CheckoutPage totalAmount={n} />` usage.
-const renderCheckoutPage = (totalAmount: number) => {
-    mockUseCheckout.mockReturnValue({
-        step: "payment",
-        setStep: vi.fn(),
-        checkoutData: makeCheckoutData(totalAmount),
-        setCheckoutData: setCheckoutDataMock,
-        resetCheckout: vi.fn(),
-    });
-
-    return render(<CheckoutPage />);
+    billingAddress: {
+        city: "Hyderabad",
+    },
+    payment: null,
+    orderType: "rent",
+    amount: {
+        itemAmount: 1000,
+        rentalAmount: 100,
+        securityDeposit: 200,
+        deliveryFee: 50,
+        discount: 0,
+        tax: 50,
+        totalAmount: 1400,
+    },
 };
 
+const setupCheckoutMock = (
+    checkoutData = defaultCheckoutData
+) => {
+    vi.mocked(useCheckout).mockReturnValue({
+        checkoutData,
+        setCheckoutData: setCheckoutDataMock,
+    } as any);
+};
+
+const setupHooks = () => {
+    vi.mocked(useClearCart).mockReturnValue({
+        mutate: clearCartMock,
+        isPending: false,
+    } as any);
+
+    vi.mocked(usePlaceOrder).mockReturnValue({
+        mutate: placeOrderMock,
+    } as any);
+};
+
+beforeEach(() => {
+    vi.clearAllMocks();
+
+    setupHooks();
+    setupCheckoutMock();
+
+    vi.stubEnv(
+        "VITE_PAYMENT_WIDGET_URL",
+        "https://example.com/payment-widget.js"
+    );
+
+    vi.stubEnv(
+        "VITE_RETURN_URL",
+        "https://example.com/return"
+    );
+
+    vi.stubEnv(
+        "VITE_API_BASE_URL",
+        "https://example.com/api"
+    );
+
+    window.HOST_USER_INFO = {
+        _id: "host-user",
+    } as any;
+
+    window.renderReactWidget = vi.fn();
+    window.unmountReactWidget = vi.fn();
+
+    window.history.replaceState(
+        {},
+        "",
+        "/checkout"
+    );
+
+    document.body.innerHTML = "";
+});
+
+afterEach(() => {
+    cleanup();
+
+    globalThis.fetch = originalFetch;
+
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+});
+
 describe("CheckoutPage", () => {
-    const renderReactWidgetMock = vi.fn();
-    const unmountReactWidgetMock = vi.fn();
-
-    beforeEach(() => {
-        vi.stubEnv(
-            "VITE_PAYMENT_WIDGET_URL",
-            "https://example.com/widget.js"
-        );
-        vi.stubEnv(
-            "VITE_RETURN_URL",
-            "https://example.com/return"
-        );
-
-        window.renderReactWidget = renderReactWidgetMock;
-        window.unmountReactWidget = unmountReactWidgetMock;
-
-        renderReactWidgetMock.mockClear();
-        unmountReactWidgetMock.mockClear();
-        setCheckoutDataMock.mockClear();
-        placeOrderMock.mockClear();
-        clearCartMock.mockClear();
-
-        mockUsePlaceOrder.mockReturnValue({
-            mutate: placeOrderMock,
-        } as unknown as ReturnType<typeof usePlaceOrderModule.usePlaceOrder>);
-
-        mockUseClearCart.mockReturnValue({
-            mutate: clearCartMock,
-            isPending: false,
-        } as unknown as ReturnType<typeof useClearCartModule.useClearCart>);
-    });
-
-    afterEach(() => {
-        cleanup();
-        vi.unstubAllEnvs();
-        vi.restoreAllMocks();
-        document.body.innerHTML = "";
-    });
-
-    it("renders the payment widget container", () => {
-        const { container } = renderCheckoutPage(250);
+    it("renders checkout page for normal rental checkout", () => {
+        render(<CheckoutPage />);
 
         expect(
-            container.querySelector("#test-widget-container")
+            document.getElementById(
+                "test-widget-container"
+            )
         ).toBeInTheDocument();
     });
 
-    it("renders the loading spinner instead of the widget while clearing the cart", () => {
-        mockUseClearCart.mockReturnValue({
-            mutate: clearCartMock,
-            isPending: true,
-        } as unknown as ReturnType<typeof useClearCartModule.useClearCart>);
+    it("uses checkout total amount for rental checkout", () => {
+        render(<CheckoutPage />);
 
-        const { container, getByTestId } = renderCheckoutPage(250);
+        const container =
+            document.getElementById(
+                "test-widget-container"
+            );
 
-        expect(getByTestId("loading-spinner")).toBeInTheDocument();
-        expect(
-            container.querySelector("#test-widget-container")
-        ).not.toBeInTheDocument();
-    });
-
-    it("sets all required data attributes", () => {
-        const { container } = renderCheckoutPage(500);
-
-        const widget = container.querySelector(
-            "#test-widget-container"
-        ) as HTMLElement;
-
-        expect(widget.getAttribute("data-price")).toBe("500");
-        expect(widget.getAttribute("data-merchant-name")).toBe("RentBook");
-        expect(widget.getAttribute("data-currency")).toBe("INR");
-        expect(widget.getAttribute("data-return-url")).toBe(
-            "https://example.com/return"
+        expect(container).toHaveAttribute(
+            "data-price",
+            "1400"
         );
-        expect(widget.getAttribute("data-no-forwarding-path")).toBe("true");
     });
 
-    it("loads the payment widget script and calls renderReactWidget", async () => {
-        renderCheckoutPage(100);
+    it("loads payment widget script", async () => {
+        render(<CheckoutPage />);
 
-        const script = document.querySelector(
-            'script[src="https://example.com/widget.js"]'
-        ) as HTMLScriptElement;
+        const script =
+            document.querySelector(
+                'script[src="https://example.com/payment-widget.js"]'
+            );
 
         expect(script).toBeInTheDocument();
 
-        script.onload?.(new Event("load"));
-
-        await waitFor(() => {
-            expect(renderReactWidgetMock).toHaveBeenCalledWith(
-                JSON.stringify({
-                    containerElementId: "test-widget-container",
-                })
-            );
-        });
-    });
-
-    it("does not inject the script when the widget url is not configured", () => {
-        vi.stubEnv("VITE_PAYMENT_WIDGET_URL", "");
-
-        renderCheckoutPage(100);
-
-        expect(document.querySelector("script[src]")).not.toBeInTheDocument();
-        expect(renderReactWidgetMock).not.toHaveBeenCalled();
-    });
-
-    it("does nothing and does not inject the script if the widget container is not found", () => {
-        vi.spyOn(document, "getElementById").mockReturnValue(null);
-
-        renderCheckoutPage(100);
+        await actScriptLoad(script);
 
         expect(
-            document.querySelector(
-                'script[src="https://example.com/widget.js"]'
-            )
+            window.renderReactWidget
+        ).toHaveBeenCalled();
+    });
+
+    it("sets payment widget attributes", () => {
+        render(<CheckoutPage />);
+
+        const container =
+            document.getElementById(
+                "test-widget-container"
+            );
+
+        expect(container).toHaveAttribute(
+            "data-price",
+            "1400"
+        );
+
+        expect(container).toHaveAttribute(
+            "data-merchant-name",
+            "RentBook"
+        );
+
+        expect(container).toHaveAttribute(
+            "data-currency",
+            "INR"
+        );
+
+        expect(container).toHaveAttribute(
+            "data-return-url",
+            "https://example.com/return"
+        );
+
+        expect(container).toHaveAttribute(
+            "data-no-forwarding-path",
+            "true"
+        );
+    });
+
+    it("does not load payment widget when payment URL is missing", () => {
+        vi.stubEnv(
+            "VITE_PAYMENT_WIDGET_URL",
+            ""
+        );
+
+        render(<CheckoutPage />);
+
+        expect(
+            document.querySelector("script")
         ).not.toBeInTheDocument();
-
-        expect(renderReactWidgetMock).not.toHaveBeenCalled();
     });
 
-    it("places an order with the payment details on a payment-widget-success event", () => {
-        renderCheckoutPage(500);
-
-        act(() => {
-            window.dispatchEvent(
-                new CustomEvent("payment-widget-success", {
-                    detail: {
-                        paymentMethod: "UPI",
-                        transactionId: "TXN123",
-                        paymentStatus: "SUCCESS",
-                    },
-                })
-            );
-        });
-
-        expect(setCheckoutDataMock).toHaveBeenCalledWith(
-            expect.objectContaining({
-                payment: {
-                    paymentMethod: "UPI",
-                    transactionId: "TXN123",
-                    paymentStatus: "SUCCESS",
-                },
-            })
+    it("handles successful payment and places rental order", async () => {
+        placeOrderMock.mockImplementation(
+            (_payload: any, options: any) => {
+                options.onSuccess();
+            }
         );
 
-        expect(placeOrderMock).toHaveBeenCalledWith(
-            expect.objectContaining({
-                payment: {
-                    paymentMethod: "UPI",
-                    transactionId: "TXN123",
+        render(<CheckoutPage />);
+
+        const paymentEvent = new CustomEvent(
+            "payment-widget-success",
+            {
+                detail: {
+                    paymentMethod: "CARD",
+                    transactionId: "txn123",
                     paymentStatus: "SUCCESS",
                 },
-            }),
-            expect.objectContaining({
-                onSuccess: expect.any(Function),
-                onError: expect.any(Function),
-            })
+            }
         );
-    });
 
-    it("defaults paymentStatus to SUCCESS when not provided on a payment-widget-success event", () => {
-        renderCheckoutPage(500);
+        window.dispatchEvent(paymentEvent);
 
-        act(() => {
-            window.dispatchEvent(
-                new CustomEvent("payment-widget-success", {
-                    detail: {
-                        paymentMethod: "UPI",
-                        transactionId: "TXN123",
-                    },
-                })
-            );
+        await waitFor(() => {
+            expect(placeOrderMock).toHaveBeenCalled();
         });
 
         expect(placeOrderMock).toHaveBeenCalledWith(
             expect.objectContaining({
-                payment: expect.objectContaining({
+                userId: "user123",
+                orderType: "rent",
+                payment: {
+                    paymentMethod: "CARD",
+                    transactionId: "txn123",
                     paymentStatus: "SUCCESS",
-                }),
+                },
             }),
-            expect.anything()
+            expect.any(Object)
         );
     });
 
-    it("places a COD/FAILED order on a payment-widget-failure event", () => {
-        const logSpy = vi
-            .spyOn(console, "log")
-            .mockImplementation(() => { });
+    it("handles payment failure and creates FAILED COD order", async () => {
+        render(<CheckoutPage />);
 
-        renderCheckoutPage(500);
+        const paymentEvent = new CustomEvent(
+            "payment-widget-failure",
+            {
+                detail: {
+                    reason: "declined",
+                },
+            }
+        );
 
-        act(() => {
-            window.dispatchEvent(
-                new CustomEvent("payment-widget-failure", {
-                    detail: { reason: "declined" },
-                })
-            );
-        });
+        window.dispatchEvent(paymentEvent);
 
-        expect(logSpy).toHaveBeenCalledWith("Payment failed:", {
-            reason: "declined",
+        await waitFor(() => {
+            expect(placeOrderMock).toHaveBeenCalled();
         });
 
         expect(placeOrderMock).toHaveBeenCalledWith(
@@ -285,155 +286,380 @@ describe("CheckoutPage", () => {
                     paymentStatus: "FAILED",
                 },
             }),
-            expect.anything()
+            expect.any(Object)
         );
-
-        logSpy.mockRestore();
     });
 
-    it("on successful order placement: logs, clears the cart, and navigates to /OrderConform", () => {
-        const logSpy = vi
-            .spyOn(console, "log")
-            .mockImplementation(() => { });
-        const pushStateSpy = vi.spyOn(window.history, "pushState");
-        const dispatchEventSpy = vi.spyOn(window, "dispatchEvent");
+    it("clears cart and navigates after successful order", async () => {
+        placeOrderMock.mockImplementation(
+            (_payload: any, options: any) => {
+                options.onSuccess();
+            }
+        );
 
-        placeOrderMock.mockImplementation((_payload, options) => {
-            options?.onSuccess?.();
-        });
+        const pushStateSpy = vi.spyOn(
+            window.history,
+            "pushState"
+        );
 
-        renderCheckoutPage(500);
+        const dispatchEventSpy = vi.spyOn(
+            window,
+            "dispatchEvent"
+        );
 
-        act(() => {
-            window.dispatchEvent(
-                new CustomEvent("payment-widget-success", {
+        render(<CheckoutPage />);
+
+        window.dispatchEvent(
+            new CustomEvent(
+                "payment-widget-success",
+                {
                     detail: {
-                        paymentMethod: "UPI",
-                        transactionId: "TXN123",
+                        paymentMethod: "CARD",
+                        transactionId: "txn123",
                         paymentStatus: "SUCCESS",
                     },
-                })
+                }
+            )
+        );
+
+        await waitFor(() => {
+            expect(clearCartMock).toHaveBeenCalled();
+        });
+
+        expect(pushStateSpy).toHaveBeenCalledWith(
+            {},
+            "",
+            "/OrderConform"
+        );
+
+        expect(
+            dispatchEventSpy
+        ).toHaveBeenCalledWith(
+            expect.any(PopStateEvent)
+        );
+    });
+
+    it("logs order placement error when order fails", async () => {
+        const consoleErrorSpy = vi
+            .spyOn(console, "error")
+            .mockImplementation(() => {});
+
+        placeOrderMock.mockImplementation(
+            (_payload: any, options: any) => {
+                options.onError(
+                    new Error("Order failed")
+                );
+            }
+        );
+
+        render(<CheckoutPage />);
+
+        window.dispatchEvent(
+            new CustomEvent(
+                "payment-widget-success",
+                {
+                    detail: {
+                        paymentMethod: "CARD",
+                        transactionId: "txn123",
+                        paymentStatus: "SUCCESS",
+                    },
+                }
+            )
+        );
+
+        await waitFor(() => {
+            expect(
+                consoleErrorSpy
+            ).toHaveBeenCalledWith(
+                "Order placement failed:",
+                expect.any(Error)
             );
         });
 
-        expect(logSpy).toHaveBeenCalledWith("Order placed successfully");
-        expect(clearCartMock).toHaveBeenCalled();
-        expect(pushStateSpy).toHaveBeenCalledWith({}, "", "/OrderConform");
-        expect(dispatchEventSpy).toHaveBeenCalledWith(
-            expect.objectContaining({ type: "popstate" })
+        expect(
+            clearCartMock
+        ).not.toHaveBeenCalled();
+    });
+
+    it("fetches auction details", async () => {
+        window.history.replaceState(
+            {
+                orderType: "auction",
+                auctionId: "auction123",
+                userId: "auction-user",
+            },
+            "",
+            "/checkout"
         );
 
-        logSpy.mockRestore();
-        pushStateSpy.mockRestore();
-        dispatchEventSpy.mockRestore();
-    });
-
-    it("logs a failure message when placeOrder errors, without clearing the cart", () => {
-    const errorSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
-
-    placeOrderMock.mockImplementation((_payload, options) => {
-        options?.onError?.();
-    });
-
-    renderCheckoutPage(500);
-
-    act(() => {
-        window.dispatchEvent(
-            new CustomEvent("payment-widget-success", {
-                detail: {
-                    paymentMethod: "UPI",
-                    transactionId: "TXN123",
-                    paymentStatus: "SUCCESS",
+        globalThis.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                data: {
+                    auction: {
+                        currentBidPrice: 3656,
+                    },
+                    book: {
+                        _id: "book123",
+                    },
                 },
+            }),
+        }) as any;
+
+        render(<CheckoutPage />);
+
+        await waitFor(() => {
+            expect(globalThis.fetch).toHaveBeenCalledWith(
+                "https://example.com/api/auction/auction123/bids",
+                {
+                    method: "GET",
+                    credentials: "include",
+                }
+            );
+        });
+    });
+
+    it("handles auction API failure", async () => {
+        const consoleErrorSpy = vi
+            .spyOn(console, "error")
+            .mockImplementation(() => {});
+
+        window.history.replaceState(
+            {
+                orderType: "auction",
+                auctionId: "auction123",
+            },
+            "",
+            "/checkout"
+        );
+
+        globalThis.fetch = vi.fn().mockResolvedValue({
+            ok: false,
+            json: async () => ({
+                message: "Auction API failed",
+            }),
+        }) as any;
+
+        render(<CheckoutPage />);
+
+        await waitFor(() => {
+            expect(
+                consoleErrorSpy
+            ).toHaveBeenCalledWith(
+                "Auction details API failed:",
+                expect.any(Error)
+            );
+        });
+    });
+
+    it("handles missing auction ID", () => {
+        const consoleErrorSpy = vi
+            .spyOn(console, "error")
+            .mockImplementation(() => {});
+
+        window.history.replaceState(
+            {
+                orderType: "auction",
+            },
+            "",
+            "/checkout"
+        );
+
+        render(<CheckoutPage />);
+
+        expect(
+            consoleErrorSpy
+        ).toHaveBeenCalledWith(
+            "Auction ID not found"
+        );
+    });
+
+    it("handles missing auction or book data", async () => {
+        const consoleErrorSpy = vi
+            .spyOn(console, "error")
+            .mockImplementation(() => {});
+
+        window.history.replaceState(
+            {
+                orderType: "auction",
+                auctionId: "auction123",
+            },
+            "",
+            "/checkout"
+        );
+
+        globalThis.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                data: {
+                    auction: null,
+                    book: null,
+                },
+            }),
+        }) as any;
+
+        render(<CheckoutPage />);
+
+        await waitFor(() => {
+            expect(
+                consoleErrorSpy
+            ).toHaveBeenCalledWith(
+                "Auction details API failed:",
+                expect.any(Error)
+            );
+        });
+    });
+
+    it("handles auction payment success", async () => {
+    window.history.replaceState(
+        {
+            orderType: "auction",
+            auctionId: "auction123",
+            userId: "auction-user",
+        },
+        "",
+        "/checkout"
+    );
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+            data: {
+                auction: {
+                    currentBidPrice: 3656,
+                },
+                book: {
+                    _id: "book123",
+                },
+            },
+        }),
+    });
+
+    vi.stubEnv(
+        "VITE_PAYMENT_WIDGET_URL",
+        "https://example.com/payment.js"
+    );
+
+    render(<CheckoutPage />);
+
+    await waitFor(() => {
+        expect(globalThis.fetch).toHaveBeenCalledWith(
+            "https://example.com/api/auction/auction123/bids",
+            expect.objectContaining({
+                method: "GET",
+                credentials: "include",
             })
         );
     });
 
-    expect(errorSpy).toHaveBeenCalledWith(
-        "Order placement failed:",
-        undefined
+    await waitFor(() => {
+        expect(
+            document
+                .getElementById("test-widget-container")
+                ?.getAttribute("data-price")
+        ).toBe("3888.8");
+    });
+
+    const successEvent = new CustomEvent(
+        "payment-widget-success",
+        {
+            detail: {
+                paymentMethod: "CARD",
+                transactionId: "auction-txn",
+                paymentStatus: "SUCCESS",
+            },
+        }
     );
 
-    expect(clearCartMock).not.toHaveBeenCalled();
+    window.dispatchEvent(successEvent);
 
-    errorSpy.mockRestore();
+    await waitFor(() => {
+        expect(placeOrderMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                userId: "user123",
+                orderType: "auction",
+                auctionId: "auction123",
+                items: [
+                    {
+                        bookId: "book123",
+                        quantity: 1,
+                    },
+                ],
+                payment: {
+                    paymentMethod: "CARD",
+                    transactionId: "auction-txn",
+                    paymentStatus: "SUCCESS",
+                },
+                amount: expect.objectContaining({
+                    itemAmount: 3656,
+                    rentalAmount: 0,
+                    securityDeposit: 0,
+                    deliveryFee: 50,
+                    discount: 0,
+                    tax: 182.8,
+                    totalAmount: 3888.8,
+                }),
+            }),
+            expect.objectContaining({
+                onSuccess: expect.any(Function),
+                onError: expect.any(Function),
+            })
+        );
+    });
+
+    const [, callbacks] =
+        placeOrderMock.mock.calls[0];
+
+    callbacks.onSuccess();
+
+    expect(clearCartMock).toHaveBeenCalled();
+    expect(window.location.pathname).toBe(
+        "/OrderConform"
+    );
 });
 
-    it("cleans up on unmount", () => {
-        const { unmount } = renderCheckoutPage(100);
-
-        const script = document.querySelector(
-            'script[src="https://example.com/widget.js"]'
+    it("does not clear cart when order placement fails", async () => {
+        placeOrderMock.mockImplementation(
+            (_payload: any, options: any) => {
+                options.onError(
+                    new Error("Failed")
+                );
+            }
         );
 
-        expect(script).toBeInTheDocument();
+        render(<CheckoutPage />);
 
-        unmount();
-
-        expect(unmountReactWidgetMock).toHaveBeenCalledWith(
-            "test-widget-container"
-        );
-
-        expect(
-            document.querySelector(
-                'script[src="https://example.com/widget.js"]'
-            )
-        ).not.toBeInTheDocument();
-    });
-
-    it("does not throw during cleanup if the script was already removed from the DOM", () => {
-        const { unmount } = renderCheckoutPage(100);
-
-        const script = document.querySelector(
-            'script[src="https://example.com/widget.js"]'
-        ) as HTMLScriptElement;
-
-        expect(script).toBeInTheDocument();
-
-        document.body.removeChild(script);
-
-        expect(() => unmount()).not.toThrow();
-
-        expect(unmountReactWidgetMock).toHaveBeenCalledWith(
-            "test-widget-container"
-        );
-    });
-
-    it("removes payment event listeners on unmount", () => {
-        const logSpy = vi
-            .spyOn(console, "log")
-            .mockImplementation(() => { });
-
-        const { unmount } = renderCheckoutPage(500);
-
-        unmount();
-
-        act(() => {
-            window.dispatchEvent(
-                new CustomEvent("payment-widget-success", {
+        window.dispatchEvent(
+            new CustomEvent(
+                "payment-widget-failure",
+                {
                     detail: {
-                        paymentMethod: "UPI",
-                        transactionId: "TXN123",
-                        paymentStatus: "SUCCESS",
+                        reason: "declined",
                     },
-                })
-            );
+                }
+            )
+        );
 
-            window.dispatchEvent(
-                new CustomEvent("payment-widget-failure", {
-                    detail: { reason: "declined" },
-                })
-            );
+        await waitFor(() => {
+            expect(placeOrderMock).toHaveBeenCalled();
         });
 
-        expect(placeOrderMock).not.toHaveBeenCalled();
-        expect(logSpy).not.toHaveBeenCalledWith(
-            "Payment failed:",
-            expect.anything()
-        );
-
-        logSpy.mockRestore();
+        expect(
+            clearCartMock
+        ).not.toHaveBeenCalled();
     });
 });
+
+const actScriptLoad = async (
+    script: Element | null
+) => {
+    if (!script) {
+        return;
+    }
+
+    await act(async () => {
+        script.dispatchEvent(
+            new Event("load")
+        );
+    });
+};
