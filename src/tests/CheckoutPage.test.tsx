@@ -589,127 +589,143 @@ describe("CheckoutPage", () => {
     });
 
     it("handles auction payment success", async () => {
-        window.history.replaceState(
-            {
+    setupCheckoutMock({
+        ...defaultCheckoutData,
+        amount: {
+            itemAmount: 3656,
+            rentalAmount: 0,
+            securityDeposit: 0,
+            deliveryFee: 50,
+            discount: 0,
+            tax: 182.8,
+            totalAmount: 3888.8,
+        },
+    });
+
+    window.history.replaceState(
+        {
+            orderType: "auction",
+            auctionId: "auction123",
+            userId: "auction-user",
+        },
+        "",
+        "/checkout"
+    );
+
+    const fetchMock = vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(
+            createResponse({
+                data: {
+                    auction: {
+                        currentBidPrice: 3656,
+                    },
+                    book: {
+                        _id: "book123",
+                    },
+                },
+            })
+        );
+
+    globalThis.fetch = fetchMock;
+
+    vi.stubEnv(
+        "VITE_PAYMENT_WIDGET_URL",
+        "https://example.com/payment.js"
+    );
+
+    render(<CheckoutPage />);
+
+    await waitFor(() => {
+        expect(fetchMock).toHaveBeenCalledWith(
+            "https://example.com/api/auction/auction123/bids",
+            expect.objectContaining({
+                method: "GET",
+                credentials: "include",
+            })
+        );
+    });
+
+    await waitFor(() => {
+        expect(
+            document
+                .getElementById("test-widget-container")
+                ?.getAttribute("data-price")
+        ).toBe("3888.8");
+    });
+
+    expect(
+        document
+            .getElementById("test-widget-container")
+            ?.getAttribute("data-merchant-name")
+    ).toBe("AuctionBook");
+
+    const successEvent = new CustomEvent(
+        "payment-widget-success",
+        {
+            detail: {
+                paymentMethod: "CARD",
+                transactionId: "auction-txn",
+                paymentStatus: "SUCCESS",
+            },
+        }
+    );
+
+    window.dispatchEvent(successEvent);
+
+    await waitFor(() => {
+        expect(placeOrderMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                userId: "user123",
                 orderType: "auction",
                 auctionId: "auction123",
-                userId: "auction-user",
-            },
-            "",
-            "/checkout"
-        );
 
-        const fetchMock = vi
-            .fn<typeof fetch>()
-            .mockResolvedValue(
-                createResponse({
-                    data: {
-                        auction: {
-                            currentBidPrice: 3656,
-                        },
-                        book: {
-                            _id: "book123",
-                        },
+                items: [
+                    {
+                        bookId: "book123",
+                        quantity: 1,
                     },
-                })
-            );
+                ],
 
-        globalThis.fetch = fetchMock;
-
-        vi.stubEnv(
-            "VITE_PAYMENT_WIDGET_URL",
-            "https://example.com/payment.js"
-        );
-
-        render(<CheckoutPage />);
-
-        await waitFor(() => {
-            expect(fetchMock).toHaveBeenCalledWith(
-                "https://example.com/api/auction/auction123/bids",
-                expect.objectContaining({
-                    method: "GET",
-                    credentials: "include",
-                })
-            );
-        });
-
-        await waitFor(() => {
-            expect(
-                document
-                    .getElementById(
-                        "test-widget-container"
-                    )
-                    ?.getAttribute("data-price")
-            ).toBe("3888.8");
-        });
-
-        const successEvent = new CustomEvent(
-            "payment-widget-success",
-            {
-                detail: {
+                payment: {
                     paymentMethod: "CARD",
                     transactionId: "auction-txn",
                     paymentStatus: "SUCCESS",
                 },
-            }
+
+                amount: {
+                    itemAmount: 3656,
+                    rentalAmount: 0,
+                    securityDeposit: 0,
+                    deliveryFee: 50,
+                    discount: 0,
+                    tax: 182.8,
+                    totalAmount: 3888.8,
+                },
+            }),
+            expect.objectContaining({
+                onSuccess: expect.any(Function),
+                onError: expect.any(Function),
+            })
         );
-
-        window.dispatchEvent(successEvent);
-
-        await waitFor(() => {
-            expect(
-                placeOrderMock
-            ).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    userId: "user123",
-                    orderType: "auction",
-                    auctionId: "auction123",
-                    items: [
-                        {
-                            bookId: "book123",
-                            quantity: 1,
-                        },
-                    ],
-                    payment: {
-                        paymentMethod: "CARD",
-                        transactionId: "auction-txn",
-                        paymentStatus: "SUCCESS",
-                    },
-                    amount: expect.objectContaining({
-                        itemAmount: 3656,
-                        rentalAmount: 0,
-                        securityDeposit: 0,
-                        deliveryFee: 50,
-                        discount: 0,
-                        tax: 182.8,
-                        totalAmount: 3888.8,
-                    }),
-                }),
-                expect.objectContaining({
-                    onSuccess: expect.any(Function),
-                    onError: expect.any(Function),
-                })
-            );
-        });
-
-        const firstCall =
-            placeOrderMock.mock.calls[0];
-
-        const callbacks =
-            firstCall?.[1] as
-                | PlaceOrderOptions
-                | undefined;
-
-        callbacks?.onSuccess?.();
-
-        expect(
-            clearCartMock
-        ).toHaveBeenCalled();
-
-        expect(
-            window.location.pathname
-        ).toBe("/OrderConform");
     });
+
+    const firstCall =
+        placeOrderMock.mock.calls[0];
+
+    const callbacks =
+        firstCall?.[1] as
+            | PlaceOrderOptions
+            | undefined;
+
+    callbacks?.onSuccess?.();
+
+    expect(clearCartMock).toHaveBeenCalled();
+
+    expect(window.location.pathname).toBe(
+        "/OrderConform"
+    );
+});
 
     it("does not clear cart when order placement fails", async () => {
         placeOrderMock.mockImplementation(
