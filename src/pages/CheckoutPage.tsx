@@ -56,20 +56,27 @@ const CheckoutPage: React.FC = () => {
      Auction amount calculation
   -------------------------------- */
 
-  const auctionDeliveryFee =
+const auctionDeliveryFee =
     checkoutData.amount?.deliveryFee ?? 0;
 
-  const auctionDiscount = 0;
+const auctionDiscount =
+    checkoutData.amount?.discount ?? 0;
 
-  const auctionSecurityDeposit = 0;
+const auctionSecurityDeposit =
+    checkoutData.amount?.securityDeposit ?? 0;
 
-  const auctionTax =
-    currentBidPrice * 0.05;
+const auctionTax =
+    checkoutData.amount?.tax ?? 0;
 
-  const auctionTotalAmount =
-    currentBidPrice +
-    auctionDeliveryFee +
-    auctionTax;
+const auctionTotalAmount =
+    checkoutData.amount?.totalAmount ??
+    (
+        currentBidPrice +
+        auctionSecurityDeposit +
+        auctionDeliveryFee -
+        auctionDiscount +
+        auctionTax
+    );
 
   /* --------------------------------
      Payment amount
@@ -195,9 +202,9 @@ const CheckoutPage: React.FC = () => {
     );
 
     container.setAttribute(
-      "data-merchant-name",
-      "RentBook"
-    );
+    "data-merchant-name",
+    isAuctionCheckout ? "AuctionBook" : "RentBook"
+);
 
     container.setAttribute(
       "data-currency",
